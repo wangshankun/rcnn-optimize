@@ -1,0 +1,2 @@
+gcc -msse4 -mavx -O3 GFLOPS.c 
+g++ -O3 -fopenmp -mavx -ffast-math dot.cpp
