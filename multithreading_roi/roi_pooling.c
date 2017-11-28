@@ -1,4 +1,5 @@
 #include "roi_pooling.h"
+#include <sys/time.h> // for clock_gettime()
 
 pthread_mutex_t counter_lock;
 static int counter = -1;
@@ -30,7 +31,6 @@ void roi_pool_inner_thread(void* set_args, int pos)
     while (1)
     {
         int n = get_counter();
-
         if(n >= num_rois) break;
 
         int roi_start_w = round(bottom_rois[n*5 + 1] * spatial_scale_);
@@ -121,38 +121,43 @@ void roi_pooling_multithreading()
     fread(bottom_rois, sizeof(float), num_rois  * 5 , fd_rois);
     close(fd_data);
     close(fd_rois);
-    //初始化多线程参数
-    queue_t                    queue_Q[MAX_CPU_NUMBER];
-    roi_pool_arg_t             ins_args;
-    ins_args.bottom_data    =  (float*)(bottom_data);
-    ins_args.bottom_rois    =  (float*)(bottom_rois);
-    ins_args.top_data       =  (float*)(top_data);
-    ins_args.num_rois       =  num_rois;
-    ins_args.pooled_height_ =  pooled_height_;
-    ins_args.pooled_width_  =  pooled_width_;
-    ins_args.width_         =  width_;
-    ins_args.height_        =  height_;
-    ins_args.channels_      =  channels_;
-    ins_args.spatial_scale_ =  spatial_scale_;
-
     //初始化时间戳
     double roipool_elapsed_time = 0;
     struct timespec start, finish;
     clock_gettime(CLOCK_MONOTONIC, &start);
-    
-    //为每个cpu上的线程分配好自己的参数
-    int i;
-    for (i = 0; i < MAX_CPU_NUMBER; i++)
+
+    int test_count = 0;
+    for (test_count = 0; test_count < 100; test_count++)//测试100次
     {
-        queue_Q[i].routine     = roi_pool_inner_thread;
-        queue_Q[i].position    = i;
-        queue_Q[i].args        = &ins_args;
+        //初始化多线程参数
+        queue_t                    queue_Q[MAX_CPU_NUMBER];
+        roi_pool_arg_t             ins_args;
+        ins_args.bottom_data    =  (float*)(bottom_data);
+        ins_args.bottom_rois    =  (float*)(bottom_rois);
+        ins_args.top_data       =  (float*)(top_data);
+        ins_args.num_rois       =  num_rois;
+        ins_args.pooled_height_ =  pooled_height_;
+        ins_args.pooled_width_  =  pooled_width_;
+        ins_args.width_         =  width_;
+        ins_args.height_        =  height_;
+        ins_args.channels_      =  channels_;
+        ins_args.spatial_scale_ =  spatial_scale_;
+        counter = -1;
+        //为每个cpu上的线程分配好自己的参数
+        int i;
+        for (i = 0; i < MAX_CPU_NUMBER; i++)
+        {
+            queue_Q[i].routine     = roi_pool_inner_thread;
+            queue_Q[i].position    = i;
+            queue_Q[i].args        = &ins_args;
+        }
+        all_sub_pthread_exec(queue_Q, MAX_CPU_NUMBER);
     }
-    all_sub_pthread_exec(queue_Q, MAX_CPU_NUMBER);
+
     clock_gettime(CLOCK_MONOTONIC, &finish);
     roipool_elapsed_time += (finish.tv_sec - start.tv_sec);
     roipool_elapsed_time += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
-    printf("roipool_elapsed_time:%f\r\n", roipool_elapsed_time);
+    printf("roipool_elapsed_time:%f test count :%d \r\n", roipool_elapsed_time, test_count);
     //savefile("my_roi_out", top_data, channels_ * num_rois * out_area * sizeof(float));
     free(bottom_data);
     free(bottom_rois);
