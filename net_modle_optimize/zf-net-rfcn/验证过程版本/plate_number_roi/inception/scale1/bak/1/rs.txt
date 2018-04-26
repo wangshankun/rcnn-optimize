@@ -1,0 +1,19 @@
+Detection took 0.070s for 300 object proposals
+Detection took 0.072s for 300 object proposals
+Detection took 0.074s for 300 object proposals
+Detection took 0.076s for 300 object proposals
+Detection took 0.073s for 300 object proposals
+Detection took 0.071s for 300 object proposals
+Detection took 0.070s for 300 object proposals
+Detection took 0.054s for 300 object proposals
+Detection took 0.070s for 300 object proposals
+save image to:  ./data/result.mat
+Done
+cnn@hdsf:~/py-R-FCN$ python count_roi_result.py 
+blue 91 123 0.739837398374
+yellow 0 1 0.0
+91 124 0.733870967742
+whole image stat:
+68 100 0.68
+Done
+

@@ -1,0 +1,20 @@
+train_net: "rfcn/squ/train_squ.prototxt"
+#train_net: "rfcn/squ/train_shuffle_neg.prototxt"
+base_lr: 0.04
+gamma: 0.1
+stepsize: 20000
+display: 20
+
+momentum: 0.9
+weight_decay: 0.0002
+
+snapshot: 5000
+
+snapshot_prefix: "squ_roi"
+
+iter_size: 16
+lr_policy: "poly"
+power: 1.0 #linearly decrease LR
+random_seed: 42
+average_loss: 40
+max_iter: 200000

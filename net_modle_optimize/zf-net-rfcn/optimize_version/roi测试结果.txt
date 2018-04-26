@@ -1,0 +1,23 @@
+org 测试100,1000张         inception4 测试100,1000张        360*216测试100张              500*300测试100,1000张(训练5000次)
+blue 123 123 1.0           blue 120 123 0.975609756098      blue 113 123 0.918699186992   blue 119 123 0.967479674797
+yellow 0 1 0.0             yellow 0 1 0.0                   yellow 0 1 0.0                yellow 0 1 0.0
+123 124 0.991935483871     120 124 0.967741935484           113 124 0.911290322581        119 124 0.959677419355
+whole image stat:          whole image stat:                whole image stat:             whole image stat:
+99 100 0.99                96 100 0.96                      89 100 0.89                   95 100 0.95
+Done                       Done                             Done                          Done
+blue 1178 1178 1.0         blue 1166 1178 0.989813242784                                  blue 1143 1178 0.970288624788
+white 0 2 0.0              white 0 2 0.0                                                  white 0 2 0.0
+yellow 0 19 0.0            yellow 0 19 0.0                                                yellow 0 19 0.0
+1178 1199 0.982485404504   1166 1199 0.97247706422                                        1143 1199 0.95329441201
+whole image stat:          whole image stat:                                              whole image stat:
+979 1000 0.979             967 1000 0.967                                                 944 1000 0.944
+Done                       Done                                                           Done
+耗时0.45                   耗时0.2                          耗时0.066                     耗时 0.112s
+
+./tools/train_net.py --gpu 0 --solver rfcn/inception/s1/solver.prototxt --imdb gs_plate_roi_train --iters 5000 --cfg /rfcn/inception/s1/zf.yml
+
+./tools/train_net.py --gpu 0 --solver rfcn/inception/s1/solver.prototxt --imdb gs_plate_roi_train --iters 10000 --cfg rfcn/inception/s1/zf.yml
+
+
+
+

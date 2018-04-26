@@ -1,0 +1,12 @@
+train_net: "rfcn/char/test/4/train.prototxt"
+base_lr: 0.01
+lr_policy: "step"
+gamma: 0.1
+stepsize: 20000
+display: 20
+momentum: 0.9
+weight_decay: 0.0005
+snapshot: 0
+snapshot_prefix: "test_char_4"
+iter_size: 2
+
