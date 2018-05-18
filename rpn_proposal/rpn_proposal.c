@@ -39,9 +39,11 @@ typedef struct{
 
 static inline u_float overlap(u_float ap1, u_float bp1, u_float ap2, u_float bp2)
 {
-    register u_float  dp1 = ap1 > bp1? ap1 : bp1;
-    register u_float  dp2 = ap2 > bp2? bp2 : ap2;
-    return dp2 - dp1 + 1;
+//    4 times slower using  ? :
+//    register u_float  dp1 = ap1 > bp1? ap1 : bp1;
+//    register u_float  dp2 = ap2 > bp2? bp2 : ap2;
+//    return dp2 - dp1 + 1;
+      return fmaxf(ap2, bp2) - fmaxf(ap1, bp1);
 }
 
 static inline u_float box_intersection(box a, box b)
