@@ -39,11 +39,7 @@ typedef struct{
 
 static inline u_float overlap(u_float ap1, u_float bp1, u_float ap2, u_float bp2)
 {
-//    4 times slower using  ? :
-//    register u_float  dp1 = ap1 > bp1? ap1 : bp1;
-//    register u_float  dp2 = ap2 > bp2? bp2 : ap2;
-//    return dp2 - dp1 + 1;
-      return fmaxf(ap2, bp2) - fmaxf(ap1, bp1);
+      return fminf(ap2, bp2) - fmaxf(ap1, bp1) + 1;
 }
 
 static inline u_float box_intersection(box a, box b)
@@ -108,7 +104,8 @@ int rpn_proposal()
     u_float widths, heights, ctr_x, ctr_y, dx, dy, dw, dh;
     u_float pred_ctr_x, pred_ctr_y, pred_w, pred_h, x1, x2, y1, y2, tmp_w, tmp_h;
 
-    while(test_count < 100)//测试100次
+    clock_gettime(CLOCK_REALTIME, &start);
+    while(test_count < 1)//测试100次
     {
 
         for(i = 0; i < anchor_num; i++)
@@ -125,7 +122,6 @@ int rpn_proposal()
     //        printf("%f %f %f %f %f %f %f %f %f\r\n",delta_boxs[i].x1, delta_boxs[i].y1, delta_boxs[i].x2, delta_boxs[i].y2, \
                     delta_boxs[i].x,delta_boxs[i].y,delta_boxs[i].w,delta_boxs[i].h,delta_boxs[i].score);
         }
-        clock_gettime(CLOCK_MONOTONIC, &start);
         qsort(delta_boxs, anchor_num, sizeof(delta_box), nms_comparator);
 
         for(i = 0; i < anchor_num; i++)
@@ -181,6 +177,8 @@ int rpn_proposal()
                 }
             }
         }
+       
+
         sc = 0;
         for(i = 0; i < pre_nms_top; i++)
         {
@@ -198,15 +196,16 @@ int rpn_proposal()
             top_data[sc].x2 = pre_boxs[i].x2;
             top_data[sc].y2 = pre_boxs[i].y2;
             top_score[sc] = pre_boxs[i].score;
-            //printf("sc:%d i:%d %f %f %f %f %f\r\n",sc,i,pre_boxs[i].x1, pre_boxs[i].y1, pre_boxs[i].x2, pre_boxs[i].y2, pre_boxs[i].score);
+//            printf("sc:%d i:%d %f %f %f %f %f\r\n",sc,i,pre_boxs[i].x1, pre_boxs[i].y1, pre_boxs[i].x2, pre_boxs[i].y2, pre_boxs[i].score);
             if(sc == post_nms_top) break;
+            //if(pre_boxs[i].score < 0.6) break;//卡门限，但筛选到低于0.6时候就跳出
         }
-        clock_gettime(CLOCK_MONOTONIC, &finish);
-        elapsed += (finish.tv_sec - start.tv_sec);
-        elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
         test_count++;
     }
     
+        clock_gettime(CLOCK_REALTIME, &finish);
+        elapsed += (finish.tv_sec - start.tv_sec);
+        elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
     printf("elapsed time:%f test count:%d\r\n",elapsed, test_count);
     free(anchor_buf);
     free(delta_buf);
