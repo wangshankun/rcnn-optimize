@@ -64,6 +64,8 @@ void psroi(void)
     double elapsed = 0;
     clock_gettime(CLOCK_MONOTONIC, &start);
     int n = 0;
+    int test_count = 0;
+    while(test_count < 100) {
     for (n = 0; n < num_rois; ++n)
     {
         int   roi_add = n * 5;
@@ -125,10 +127,12 @@ void psroi(void)
             }
         }
     }
+    test_count += 1;
+    }
     clock_gettime(CLOCK_MONOTONIC, &finish);
     elapsed = (finish.tv_sec - start.tv_sec);
     elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
-    printf("elapsed time:%f\r\n",elapsed);
+    printf("single psroi test 100 times elapsed time:%f\r\n",elapsed);
     free(bottom_data);
     free(bottom_rois);
     savefile("./ctop.bin",top_data,294000);
