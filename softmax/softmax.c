@@ -42,7 +42,7 @@
 void softmax()
 {
     int outer_num_   = 300;
-    int channels     = 11;
+    int channels     = 5;
     int inner_num_   = 1;
     int dim          = channels * inner_num_;
     float* in_data   = calloc(outer_num_ * dim, sizeof(float));
@@ -58,10 +58,18 @@ void softmax()
     }
     fread(in_data, sizeof(float), outer_num_ * dim , fd_data);
     close(fd_data);
-    memcpy(out_data, in_data, outer_num_ * dim * sizeof(float));
 
+    //初始化时间戳
+    double softmax_elapsed_time = 0;
+    struct timespec start, finish;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    int test_count = 0;
+    for (test_count = 0; test_count < 100; test_count++)//测试100次
+    {
     //计算softmax
     register unsigned int n, c, k;
+    memcpy(out_data, in_data, outer_num_ * dim * sizeof(float));
     for (n = 0; n < outer_num_; n++)
     {
         for (k = 0; k < inner_num_; k++)
@@ -99,8 +107,12 @@ void softmax()
             }
         }    
     }
-
-    savefile("my_cls_prob.bin", out_data, outer_num_ * dim * sizeof(float));
+    }
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+    softmax_elapsed_time += (finish.tv_sec - start.tv_sec);
+    softmax_elapsed_time += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+    printf("softmax test 100 times elapsed time:%f \r\n", softmax_elapsed_time);
+    savefile("my_cls_prob_pre.bin", out_data, outer_num_ * dim * sizeof(float));
     free(in_data);
     free(out_data);
     free(max_data);
