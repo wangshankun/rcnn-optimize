@@ -138,6 +138,7 @@ int psroi_pooling_multithreading(psroi_pool_arg_t arg)
         queue_Q[i].position    = i;
         queue_Q[i].args        = &ins_args;
     }
+    //执行所有线程
     all_sub_pthread_exec(queue_Q, MAX_CPU_NUMBER);
 
     pthread_spin_destroy(&g_spin);

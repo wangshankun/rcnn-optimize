@@ -61,8 +61,9 @@ while (c < 100):
 print time.time() - s
 libpsroi.sub_pthread_exit()
 '''
+#建立多线程环境
+libpsroi.sub_pthreads_setup()
 
-libpsroi.sub_pthread_init()
 c = 0
 while (c < 100):#100次循环测试
     #执行psroi函数，返回结果存储在top_data中
@@ -73,4 +74,3 @@ while (c < 100):#100次循环测试
         print "Error"
     c = c + 1
     print c
-libpsroi.sub_pthread_exit()

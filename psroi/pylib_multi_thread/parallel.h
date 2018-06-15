@@ -40,5 +40,4 @@ typedef struct {
 } sub_thread_status_t;
 
 void all_sub_pthread_exec(queue_t *queue_Q, int exec_thread_num);
-void sub_pthread_init(void);
-void sub_pthread_exit(void);
+void sub_pthreads_setup(void);
