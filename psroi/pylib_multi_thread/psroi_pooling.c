@@ -2,6 +2,10 @@
 #include <sys/time.h> // for clock_gettime()
 
 pthread_spinlock_t g_spin;
+/*在Linux 4.4.77(38) SMP aarch64中发现mutex会在首次执行时候大概率性的失效；
+  因此换为spinlock，本库多线程小于等于cpu个数，且仅仅锁住一个自的加操作，采用
+  spinlock会更合适更高效
+*/
 //pthread_mutex_t counter_lock;
 volatile int counter = -1;
 static __inline int get_counter(void)
