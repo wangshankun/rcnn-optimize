@@ -8,53 +8,47 @@
 #include<fcntl.h>
 #include<unistd.h>
 
-#define  u_float float 
 #define  max_height 599
 #define  max_width  876
 #define  anchor_num 19656
 #define  pre_nms_top 6000
 #define  post_nms_top 300
 
-u_float thresh_u_float = 0.7;
-u_float min_size = 1.496;
+float thresh_float = 0.7;
+float min_size = 1.496;
 
 typedef struct{
-    u_float x1, y1, x2, y2;
+    float x1, y1, x2, y2;
 } anchor;
 
 typedef struct{
-    u_float x, y, w, h;
+    float x, y, w, h;
 } delta;
 
 typedef struct{
-    u_float x1, y1, x2, y2;
-    u_float x, y, w, h;
-    u_float score;
+    float x1, y1, x2, y2;
+    float x, y, w, h;
+    float score;
 } delta_box;
 
 typedef struct{
-    u_float x1, y1, x2, y2;
-    u_float score, prob_area;
+    float x1, y1, x2, y2;
+    float score, prob_area;
 } box;
 
-static inline u_float overlap(u_float ap1, u_float bp1, u_float ap2, u_float bp2)
-{
-      return fminf(ap2, bp2) - fmaxf(ap1, bp1) + 1;
+static float box_intersection(box a, box b)
+{    
+    float w = fminf(a.x2, b.x2) - fmaxf(a.x1, b.x1) + 1;
+    float h = fminf(a.y2, b.y2) - fmaxf(a.y1, b.y1) + 1;
+    //if(w < 0 || h < 0) return 0;减少一个判断节省30%时间
+    //因为最终是与thresh_float对比，即使重合面积是负数不影响判断
+    return w*h;
 }
 
-static inline u_float box_intersection(box a, box b)
+static float box_iou(box a, box b)
 {
-    u_float w = overlap(a.x1, b.x1, a.x2, b.x2);
-    u_float h = overlap(a.y1, b.y1, a.y2, b.y2);
-    if(w < 0 || h < 0) return 0;
-    u_float area = w*h;
-    return area;
-}
-
-static inline u_float box_iou(box a, box b)
-{
-    u_float inter = box_intersection(a, b);
-    return (u_float)((float)inter/(a.prob_area + b.prob_area - inter));
+    float inter = box_intersection(a, b);
+    return (float)((float)inter/(a.prob_area + b.prob_area - inter));
 }
 
 int nms_comparator(const void *pa, const void *pb)
@@ -67,11 +61,11 @@ int rpn_proposal()
     delta_box* delta_boxs  = calloc(anchor_num, sizeof(delta_box));
     box*       pre_boxs    = calloc(pre_nms_top,    sizeof(box));
     anchor*    top_data    = calloc(post_nms_top, sizeof(anchor));
-    u_float*   top_score   = calloc(post_nms_top, sizeof(u_float));
+    float*   top_score   = calloc(post_nms_top, sizeof(float));
     
     anchor*  anchor_buf    = calloc(anchor_num, sizeof(anchor));
     delta*   delta_buf     = calloc(anchor_num, sizeof(delta));
-    u_float* score_buf     = calloc(anchor_num, sizeof(u_float));  
+    float* score_buf     = calloc(anchor_num, sizeof(float));  
     int fd_anchor, fd_delta, fd_score;
 
     if((fd_anchor = fopen("./anchors","rb")) ==-1)
@@ -89,7 +83,7 @@ int rpn_proposal()
     
     printf("fd_anchor read size:%d \r\n", fread(anchor_buf, sizeof(anchor),  anchor_num,  fd_anchor));
     printf("fd_delta read size:%d  \r\n", fread(delta_buf,  sizeof(delta),   anchor_num,  fd_delta));    
-    printf("fd_score read size:%d  \r\n", fread(score_buf,  sizeof(u_float), anchor_num,  fd_score));
+    printf("fd_score read size:%d  \r\n", fread(score_buf,  sizeof(float), anchor_num,  fd_score));
    
 
     close(fd_delta);
@@ -101,11 +95,11 @@ int rpn_proposal()
     double elapsed = 0;
 
 
-    u_float widths, heights, ctr_x, ctr_y, dx, dy, dw, dh;
-    u_float pred_ctr_x, pred_ctr_y, pred_w, pred_h, x1, x2, y1, y2, tmp_w, tmp_h;
+    float widths, heights, ctr_x, ctr_y, dx, dy, dw, dh;
+    float pred_ctr_x, pred_ctr_y, pred_w, pred_h, x1, x2, y1, y2, tmp_w, tmp_h;
 
     clock_gettime(CLOCK_REALTIME, &start);
-    while(test_count < 1)//测试100次
+    while(test_count < 100)//测试100次
     {
 
         for(i = 0; i < anchor_num; i++)
@@ -185,7 +179,7 @@ int rpn_proposal()
             if(pre_boxs[i].prob_area == 0) continue;
             for(j = i+1; j < pre_nms_top; j++)
             {
-                if (box_iou(pre_boxs[i], pre_boxs[j]) > thresh_u_float)
+                if (box_iou(pre_boxs[i], pre_boxs[j]) > thresh_float)
                 {
                     pre_boxs[j].prob_area = 0;
                 }
@@ -198,7 +192,7 @@ int rpn_proposal()
             top_score[sc] = pre_boxs[i].score;
 //            printf("sc:%d i:%d %f %f %f %f %f\r\n",sc,i,pre_boxs[i].x1, pre_boxs[i].y1, pre_boxs[i].x2, pre_boxs[i].y2, pre_boxs[i].score);
             if(sc == post_nms_top) break;
-            //if(pre_boxs[i].score < 0.6) break;//卡门限，但筛选到低于0.6时候就跳出
+  //          if(pre_boxs[i].score < 0.6) break;
         }
         test_count++;
     }
@@ -206,7 +200,7 @@ int rpn_proposal()
         clock_gettime(CLOCK_REALTIME, &finish);
         elapsed += (finish.tv_sec - start.tv_sec);
         elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
-    printf("elapsed time:%f test count:%d\r\n",elapsed, test_count);
+    printf("elapsed time:%f test count:%d \r\n",elapsed, test_count);
     free(anchor_buf);
     free(delta_buf);
     free(score_buf);
