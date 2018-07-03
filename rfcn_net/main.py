@@ -19,12 +19,16 @@ def py_cpu_nms(dets, nms_thresh, con_thresh):
     x2 = dets[:, 2]
     y2 = dets[:, 3]
     scores = dets[:, 4]
-
+    keep = []
+    if np.max(scores) < con_thresh:#最大得分都不够thresh那么全部舍弃
+        return keep
     areas = (x2 - x1 + 1) * (y2 - y1 + 1)
     order = scores.argsort()[::-1]
-    keep = []
+
     while order.size > 0:
         i = order[0]
+        if scores[i] < con_thresh:#因为已经排序,只有后面得分小于thresh,后面就不需要继续
+            break
         keep.append(i)
         xx1 = np.maximum(x1[i], x1[order[1:]])
         yy1 = np.maximum(y1[i], y1[order[1:]])
@@ -38,7 +42,6 @@ def py_cpu_nms(dets, nms_thresh, con_thresh):
 
         inds = np.where(ovr <= nms_thresh)[0]
         order = order[inds + 1]
-
     return keep
 
 
@@ -107,13 +110,17 @@ cls_data     = cls_data_np.ctypes.data_as(POINTER(c_float))
 box_data_np  = np.load('rfcn_bbox.npy')
 box_data     = box_data_np.ctypes.data_as(POINTER(c_float))
 
-out_rois    = (c_float * (POST_NMS_NUM * 5))()
-out_scores  = (c_float * (POST_NMS_NUM * OUT_CLS_NUM))()
-out_deltas  = (c_float * (POST_NMS_NUM * OUT_BOX_NUM * AVE_POOLED * AVE_POOLED))()
+im_info      = np.load("./im_info.npy")
+im_info      = im_info.reshape(3,-1)
+             
+out_rois     = (c_float * (POST_NMS_NUM * 5))()
+out_scores   = (c_float * (POST_NMS_NUM * OUT_CLS_NUM))()
+out_deltas   = (c_float * (POST_NMS_NUM * OUT_BOX_NUM * AVE_POOLED * AVE_POOLED))()
 
-data_w = 400.0
-data_h = 225.0
-data_scale = 0.3125
+data_w = im_info[1]#400.0
+data_h = im_info[0]#225.0
+data_scale = im_info[2]#0.3125
+
 input = input_t(data_w, data_h, data_scale, cls_score, box_delta, cls_data, box_data, 
                     out_rois, out_scores, out_deltas)
 
@@ -122,7 +129,6 @@ cnn.sub_pthreads_setup()
 
 cnn.net_prepare_memory()
 
-s=time.time()
 cnn.net_update_relation(input)
 
 num_rois = cnn.net_forward()
@@ -141,17 +147,6 @@ scores = scores.reshape(num_rois, OUT_CLS_NUM)
 box_deltas = deltas[0:OUT_BOX_NUM * num_rois]
 box_deltas = box_deltas.reshape(num_rois, OUT_BOX_NUM)
 
-
-im_info     = np.load("./im_info.npy")
-#box_deltas  = np.load("./bbox_pred.npy")
-#scores      = np.load("./cls_prob.npy")
-#rois        = np.load("./rois.npy")
-
-im_info     = im_info.reshape(3,-1)
-
-im_h = im_info[0]/im_info[2]
-im_w = im_info[1]/im_info[2]
-
 keep = []
 for index in range(0, scores.shape[0]):
     if scores[index][0] < 0.5:#保留背景小于0.5的
@@ -163,8 +158,11 @@ box_deltas = box_deltas[keep]
 boxes      = rois[:, 1:5] / im_info[2]
 
 
+im_h = im_info[0]/im_info[2]#获得原始图像的长宽
+im_w = im_info[1]/im_info[2]
 pred_boxes = bbox_transform_inv(boxes, box_deltas)
 pred_boxes = clip_boxes(pred_boxes, (im_h, im_w))
+
 
 CONF_THRESH = 0.8
 NMS_THRESH  = 0.3
@@ -175,12 +173,8 @@ for cls_ind, cls in enumerate(CLASSES[1:]):
     dets = np.hstack((cls_boxes, cls_scores[:, np.newaxis])).astype(np.float32)
     keep = py_cpu_nms(dets, NMS_THRESH, CONF_THRESH)
     dets = dets[keep, :]
-    inds = np.where(dets[:, -1] >= CONF_THRESH)[0]
-    if len(inds) == 0:
-        continue 
-    for i in inds:
-        bbox  = dets[i, :4]
-        score = dets[i, -1]
+    for x in dets:
+        bbox  = x[:4]
+        score = x[-1]
         print bbox, score, CLASSES[cls_ind]
 
-print time.time() - s

@@ -40,7 +40,7 @@ static float box_intersection(pre_rois_t a, pre_rois_t b)
     float w = fminf(a.x2, b.x2) - fmaxf(a.x1, b.x1) + 1;                           
     float h = fminf(a.y2, b.y2) - fmaxf(a.y1, b.y1) + 1;                           
     //if(w < 0 || h < 0) return 0;减少一个判断节省30%时间                          
-    //㮠为最终是与thresh_float对比，即使重合面积是负数不影响判断                   
+    //最终是与thresh_float对比，即使重合面积是负数不影响判断                   
     return w*h;                                                                        
 }                                                                                      
                                                                                        

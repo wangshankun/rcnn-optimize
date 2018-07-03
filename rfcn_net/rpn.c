@@ -56,10 +56,10 @@ int rpn(rpn_arg_t *arg)
         int point_anchor_x       = point_anchor_index%feature_w;
         
         //根据x,y,offset得知此这个anchor如何是根据base_anchor如何平移获得
-        float anchor_x1 = base_anchor[point_anchor_offset].x1 + 16 * point_anchor_x;//16是anchor的步长                               
-        float anchor_y1 = base_anchor[point_anchor_offset].y1 + 16 * point_anchor_y;                         
-        float anchor_x2 = base_anchor[point_anchor_offset].x2 + 16 * point_anchor_x;                         
-        float anchor_y2 = base_anchor[point_anchor_offset].y2 + 16 * point_anchor_y;
+        float anchor_x1 = base_anchor[point_anchor_offset].x1 + FEAT_STRIDE * point_anchor_x;//FEAT_STRIDE是anchor的步长                               
+        float anchor_y1 = base_anchor[point_anchor_offset].y1 + FEAT_STRIDE * point_anchor_y;                         
+        float anchor_x2 = base_anchor[point_anchor_offset].x2 + FEAT_STRIDE * point_anchor_x;                         
+        float anchor_y2 = base_anchor[point_anchor_offset].y2 + FEAT_STRIDE * point_anchor_y;
         //printf("%f %f %f %f %d\r\n",anchor_x1,anchor_y1,anchor_x2,anchor_y2,total_anchor_index);
         int delta_index = point_anchor_offset * feature_area * 4 + point_anchor_index;
         float delta_x   = bottom_delta[delta_index + 0 * feature_area];                           
