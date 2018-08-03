@@ -1,0 +1,19 @@
+train_net: "rt3399/data/roi/normal/train_agnostic_ohem.prototxt"
+base_lr: 0.01
+#train_net: "models/container_digits/ZF512/rfcn_end2end_relu_bn_good/train_agnostic_global_ohem.prototxt"
+#base_lr: 0.001
+lr_policy: "step"
+gamma: 0.1
+stepsize: 20000
+display: 20
+
+momentum: 0.9
+weight_decay: 0.0005
+# We disable standard caffe solver snapshotting and implement our own snapshot
+# function
+snapshot: 5000
+# We still use the snapshot prefix, though
+snapshot_prefix: "gs_plate_roi_local_float"
+#snapshot_prefix: "gs_plate_roi_global_float"
+iter_size: 2
+# debug_info: true
