@@ -18,6 +18,7 @@ typedef struct {
     //7层layer
     softmax_arg_t      softmax_rpn_arg;
     rpn_arg_t          rpn_arg;
+
     psroi_pool_arg_t   psroi_cls_arg;
     ave_pool_arg_t     ave_cls_arg;
     softmax_arg_t      softmax_rfcn_arg;
@@ -40,7 +41,7 @@ typedef struct {
 
 net_t net;
 
-void net_prepare_memory()
+void net_prepare_memory(char* base_anchor_path)
 {
     net.rpn_softmax_top_data  = calloc(MAX_ANCHOR_NUM * RPN_CLS_NUM, sizeof(float));
     net.psroi_cls_top_data    = calloc(OUT_CLS_NUM    * POST_NMS_NUM * POOLING_SIZE * POOLING_SIZE, sizeof(float));
@@ -49,7 +50,7 @@ void net_prepare_memory()
 
     int fd_anchor = 0;    
     net.base_anchor           = calloc(RPN_ANCHOR_CHANNEL, sizeof(anchor_t));
-    if((fd_anchor             = fopen("./base_anchor.bin","rb"))   == -1) return -1;
+    if((fd_anchor             = fopen(base_anchor_path, "rb"))   == -1) return -1;
     fread(net.base_anchor, sizeof(anchor_t), RPN_ANCHOR_CHANNEL, fd_anchor);
     close(fd_anchor);
 }

@@ -1,102 +1,80 @@
-# -*- coding:utf-8 -*- 
-from ctypes import *
-import time
+# -*- coding:utf-8 -*-
 import numpy as np
+import os,  time, struct
+from socket import *
+from ctypes import *
+from after_rfcn import *
+from cStringIO import StringIO
+
 np.set_printoptions(threshold=np.nan)
 
-CLASSES = ('__background__',
-           'a', 'b', 'c', 'd',
-           'e', 'f', 'g', 'h')
+def fix_to_int(data, point):
+    data = data*2**point
+    data = np.around(data)
+    data = data.astype(np.int16)
+    return data
+
+def int_to_float(data, point):
+    data = data.astype(np.float32)
+    data = data/(2**point)
+    return data
+
+def to_caffe_format(output_np, c, c_org, h , w, w_org):
+    output_np   = output_np.reshape((int(c/4), h, w, 4))
+    output_np   = output_np.transpose((0,3,1,2))
+    output_np   = output_np.reshape((1, c, h, w))
+    output_np   = output_np[:,0:c_org,:,0:w_org]
+    output_np   = int_to_float(output_np,7)
+    return output_np
+
+def img_2_blob(img_org):
+    target_size   = 360 
+    cfg_max_size  = 480
+    PIXEL_MEANS   = np.array([[[102.9801, 115.9465, 122.7717]]])
+
+    im_shape = img_org.shape
+    im_size_min = np.min(im_shape[0:2])
+    im_size_max = np.max(im_shape[0:2])
+
+    data_scale = float(target_size) / float(im_size_min)
+    # Prevent the biggest axis from being more than MAX_SIZE
+    if np.round(data_scale * im_size_max) > cfg_max_size:
+        data_scale = float(cfg_max_size) / float(im_size_max)
+
+    img = cv2.resize(img_org, None, None, fx=data_scale, fy=data_scale,
+                    interpolation=cv2.INTER_LINEAR)
+
+    img = img - PIXEL_MEANS
+
+    img = fix_to_int(img, 7)
+
+    img = np.pad(img, ((0,0),(0,(img.shape[1])%8),(0,1)), 'constant')  
+    
+    return img, data_scale 
+
+
+CLASSES = ('__background__','truck')
            
-POST_NMS_NUM = 300
-OUT_CLS_NUM  = 9
-OUT_BOX_NUM  = 8
-AVE_POOLED   = 7
+POST_NMS_NUM = 300#最多300个roi结果
+OUT_CLS_NUM  = 2#两类
+OUT_BOX_NUM  = 8#8个坐标
+AVE_POOLED   = 7#psroi投票框为7*7
 
-def py_cpu_nms(dets, nms_thresh, con_thresh):
-    x1 = dets[:, 0]
-    y1 = dets[:, 1]
-    x2 = dets[:, 2]
-    y2 = dets[:, 3]
-    scores = dets[:, 4]
-    keep = []
-    if np.max(scores) < con_thresh:#最大得分都不够thresh那么全部舍弃
-        return keep
-    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
-    order = scores.argsort()[::-1]
+im_info    = np.load("./im_info.npy")
+im_info    = im_info.reshape(3,-1)
+data_h     = im_info[0]
+data_w     = im_info[1]
+data_scale = im_info[2]
+             
+out_rois   = (c_float * (POST_NMS_NUM * 5))()
+out_scores = (c_float * (POST_NMS_NUM * OUT_CLS_NUM))()
+out_deltas = (c_float * (POST_NMS_NUM * OUT_BOX_NUM * AVE_POOLED * AVE_POOLED))()
 
-    while order.size > 0:
-        i = order[0]
-        if scores[i] < con_thresh:#因为已经排序,只有后面得分小于thresh,后面就不需要继续
-            break
-        keep.append(i)
-        xx1 = np.maximum(x1[i], x1[order[1:]])
-        yy1 = np.maximum(y1[i], y1[order[1:]])
-        xx2 = np.minimum(x2[i], x2[order[1:]])
-        yy2 = np.minimum(y2[i], y2[order[1:]])
-
-        w = np.maximum(0.0, xx2 - xx1 + 1)
-        h = np.maximum(0.0, yy2 - yy1 + 1)
-        inter = w * h
-        ovr = inter / (areas[i] + areas[order[1:]] - inter)
-
-        inds = np.where(ovr <= nms_thresh)[0]
-        order = order[inds + 1]
-    return keep
-
-
-def bbox_transform_inv(boxes, deltas):
-    deltas = np.squeeze(deltas) ######ADD
-    boxes = np.squeeze(boxes) ######ADD
-    if boxes.shape[0] == 0:
-        return np.zeros((0, deltas.shape[1]), dtype=deltas.dtype)
-    boxes = boxes.astype(deltas.dtype, copy=False)
-
-    widths = boxes[:, 2] - boxes[:, 0] + 1.0
-    heights = boxes[:, 3] - boxes[:, 1] + 1.0
-    ctr_x = boxes[:, 0] + 0.5 * widths
-    ctr_y = boxes[:, 1] + 0.5 * heights
-
-    dx = deltas[:, 0::4]
-    dy = deltas[:, 1::4]
-    dw = deltas[:, 2::4]
-    dh = deltas[:, 3::4]
-
-    pred_ctr_x = dx * widths[:, np.newaxis] + ctr_x[:, np.newaxis]
-    pred_ctr_y = dy * heights[:, np.newaxis] + ctr_y[:, np.newaxis]
-    pred_w = np.exp(dw) * widths[:, np.newaxis]
-    pred_h = np.exp(dh) * heights[:, np.newaxis]
-
-    pred_boxes = np.zeros(deltas.shape, dtype=deltas.dtype)
-    # x1
-    pred_boxes[:, 0::4] = pred_ctr_x - 0.5 * pred_w
-    # y1
-    pred_boxes[:, 1::4] = pred_ctr_y - 0.5 * pred_h
-    # x2
-    pred_boxes[:, 2::4] = pred_ctr_x + 0.5 * pred_w
-    # y2
-    pred_boxes[:, 3::4] = pred_ctr_y + 0.5 * pred_h
-
-    return pred_boxes
-
-def clip_boxes(boxes, im_shape):
-    boxes[:, 0::4] = np.maximum(np.minimum(boxes[:, 0::4], im_shape[1] - 1), 0)
-    boxes[:, 1::4] = np.maximum(np.minimum(boxes[:, 1::4], im_shape[0] - 1), 0)
-    boxes[:, 2::4] = np.maximum(np.minimum(boxes[:, 2::4], im_shape[1] - 1), 0)
-    boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
-    return boxes
-
-class input_t(Structure):
-    _fields_ = [("data_w",      c_float),
-                ("data_h",      c_float),
-                ("data_scale",  c_float),
-                ("cls_score",   POINTER(c_float)),
-                ("box_delta",   POINTER(c_float)),
-                ("cls_data",    POINTER(c_float)),
-                ("box_data",    POINTER(c_float)),
-                ("out_rois",    POINTER(c_float)),
-                ("out_scores",  POINTER(c_float)),
-                ("out_deltas",  POINTER(c_float))]
+result     = np.zeros((30, 6),np.float32)
+    
+cnn = cdll.LoadLibrary('./libnet.so')
+cnn.sub_pthreads_setup()
+cnn.net_prepare_memory("./base_anchor.bin")
 
 cls_score_np = np.load('rpn_cls_score.npy')
 cls_score    = cls_score_np.ctypes.data_as(POINTER(c_float))
@@ -113,29 +91,19 @@ box_data     = box_data_np.ctypes.data_as(POINTER(c_float))
 im_info      = np.load("./im_info.npy")
 im_info      = im_info.reshape(3,-1)
              
-out_rois     = (c_float * (POST_NMS_NUM * 5))()
-out_scores   = (c_float * (POST_NMS_NUM * OUT_CLS_NUM))()
-out_deltas   = (c_float * (POST_NMS_NUM * OUT_BOX_NUM * AVE_POOLED * AVE_POOLED))()
-
-data_w = im_info[1]#400.0
-data_h = im_info[0]#225.0
-data_scale = im_info[2]#0.3125
 
 input = input_t(data_w, data_h, data_scale, cls_score, box_delta, cls_data, box_data, 
                     out_rois, out_scores, out_deltas)
-
-cnn = cdll.LoadLibrary('./libnet.so')
-cnn.sub_pthreads_setup()
-
-cnn.net_prepare_memory()
+                
+s = time.time()
 
 cnn.net_update_relation(input)
 
 num_rois = cnn.net_forward()
+
 rois   = np.frombuffer(out_rois,   dtype=np.float32)
 scores = np.frombuffer(out_scores, dtype=np.float32)
 deltas = np.frombuffer(out_deltas, dtype=np.float32)
-cnn.net_release_memory()
 
 #后续处理
 rois   = rois[0:5 * num_rois]
@@ -155,26 +123,44 @@ for index in range(0, scores.shape[0]):
 rois       = rois[keep]
 scores     = scores[keep]
 box_deltas = box_deltas[keep]
-boxes      = rois[:, 1:5] / im_info[2]
+boxes      = rois[:, 1:5] / data_scale
 
 
-im_h = im_info[0]/im_info[2]#获得原始图像的长宽
-im_w = im_info[1]/im_info[2]
+im_h = data_h/data_scale#获得原始图像的长宽
+im_w = data_w/data_scale
 pred_boxes = bbox_transform_inv(boxes, box_deltas)
 pred_boxes = clip_boxes(pred_boxes, (im_h, im_w))
 
 
+
 CONF_THRESH = 0.8
 NMS_THRESH  = 0.3
+t_ix = 0
 for cls_ind, cls in enumerate(CLASSES[1:]):
     cls_ind += 1 # because we skipped background
     cls_boxes = pred_boxes[:, 4 : 8]
     cls_scores = scores[:, cls_ind]
     dets = np.hstack((cls_boxes, cls_scores[:, np.newaxis])).astype(np.float32)
+
+    if len(dets) == 0:
+        continue
+
     keep = py_cpu_nms(dets, NMS_THRESH, CONF_THRESH)
     dets = dets[keep, :]
+
+    if len(dets) == 0:
+        continue
+
     for x in dets:
-        bbox  = x[:4]
-        score = x[-1]
-        print bbox, score, CLASSES[cls_ind]
+        #bbox  = x[:4]
+        #score = x[-1]
+        result[t_ix,:4] = x[:4]
+        result[t_ix,4]  = x[-1]
+        result[t_ix,5]  = cls_ind
+        t_ix = t_ix + 1
+
+#print result
+
+print time.time() - s
+
 
