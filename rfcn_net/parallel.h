@@ -24,7 +24,7 @@
 #include <sys/cdefs.h>
 
 //根据CPU核数配置线程数
-#define MAX_CPU_NUMBER 1//在比较强的CPU情况下只用单核更有效率
+#define MAX_CPU_NUMBER 2
 
 #define THREAD_STATUS_SLEEP 2
 #define THREAD_STATUS_WAKEUP 4
