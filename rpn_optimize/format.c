@@ -83,6 +83,7 @@ void main()
             float delta_h   = delta_buf[total_anchor_index].h;                           
             //int score  = s2index[i].score;
 
+            //开始做bounding box regression
             anchor_w     = anchor_x2 - anchor_x1 + 1;
             anchor_h     = anchor_y2 - anchor_y1 + 1;
             anchor_ctr_x = anchor_x1 + 0.5 * anchor_w;
@@ -109,7 +110,7 @@ void main()
             y2 = y2>0? y2: 0;
             tmp_h = y2 - y1 + 1;
             
-            if((tmp_w >= min_size) & (tmp_h >= min_size))
+            if((tmp_w >= min_size) & (tmp_h >= min_size))//过小尺寸不进入预选
             {
                 pre_rois[pre_roi_num].x1 = x1;
                 pre_rois[pre_roi_num].x2 = x2;
@@ -121,7 +122,7 @@ void main()
             }
             if (pre_roi_num >= pre_nms_top) break;//pre roi数量够,跳出循环
         }
-        
+        //开始做NMS, prob_area是存储box面积的，同时也做nms筛选的flag,如果面积被设置为0就被筛掉 
         int j = 0, post_roi_num = 0;
         for(i = 0; i < pre_roi_num; i++)
         {
