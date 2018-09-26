@@ -188,6 +188,8 @@ void ave_pool(ave_pool_arg_t* arg)
     //top_data    -= num * channels ;
 }
 
+//N,C,H,W
+//N = outer_num; C = channels; H*W = inner_num
 void softmax(softmax_arg_t* arg)
 {
     int outer_num      = arg->outer_num;
@@ -200,19 +202,19 @@ void softmax(softmax_arg_t* arg)
     register int dim   = channels * inner_num;
     //计算softmax
     register unsigned int n, c, k;
-    memcpy(top_data, bottom_data, outer_num * dim * sizeof(float));
+    memcpy(top_data, bottom_data, outer_num * dim * sizeof(float));//将bottom内容复制到top中,后续计算用到
     for (n = 0; n < outer_num; n++)
     {
         for (k = 0; k < inner_num; k++)
         {
-            max_data[k] = -FLT_MAX;
+            max_data[k] = FLT_MIN;//max_data预设置最小值,后面有比较大小时候用
         }  
-        
-        register unsigned int out_index = n * dim;
-        for (c = 0; c < channels; c++)
-        {
-            for (k = 0; k < inner_num; k++)
-            {
+                                                                          /* N    C  inner_num     */
+        register unsigned int out_index = n * dim;                        /* 1 x  3 x 4 * max_data */
+        for (c = 0; c < channels; c++)//按照channel遍历出inner_num个最大值/*  4  -1   7 *   7      */
+        {                                                                 /*  3   9  -6 *   9      */
+            for (k = 0; k < inner_num; k++)                               /* -2   1   0 *   1      */
+            {                                                             /*  7   3  -2 *   7      */
                 max_data[k] = fmaxf(max_data[k], bottom_data[out_index + c * inner_num + k]);
             }
         }
