@@ -97,10 +97,11 @@ input = input_t(data_w, data_h, data_scale, cls_score, box_delta, cls_data, box_
                 
 s = time.time()
 
-cnn.net_update_relation(input)
+cnn.net_update_relation(input)#将输入参数更新到网络
 
-num_rois = cnn.net_forward()
+num_rois = cnn.net_forward()#开始执行7个逻辑层的计算
 
+#取出计算结果
 rois   = np.frombuffer(out_rois,   dtype=np.float32)
 scores = np.frombuffer(out_scores, dtype=np.float32)
 deltas = np.frombuffer(out_deltas, dtype=np.float32)
@@ -126,11 +127,11 @@ box_deltas = box_deltas[keep]
 boxes      = rois[:, 1:5] / data_scale
 
 
+#做一次box regression
 im_h = data_h/data_scale#获得原始图像的长宽
 im_w = data_w/data_scale
 pred_boxes = bbox_transform_inv(boxes, box_deltas)
 pred_boxes = clip_boxes(pred_boxes, (im_h, im_w))
-
 
 
 CONF_THRESH = 0.8
@@ -159,7 +160,7 @@ for cls_ind, cls in enumerate(CLASSES[1:]):
         result[t_ix,5]  = cls_ind
         t_ix = t_ix + 1
 
-#print result
+print result
 
 print time.time() - s
 

@@ -48,7 +48,7 @@ void psroi_pool_inner_thread(void* set_args, int pos)
         float bin_size_w = (float)(roi_width) / (float)(pooled_width);
         float* batch_data = bottom_data;
         int ctop, ph, pw, h, w;
-        for (ctop = 0; ctop < output_dim; ++ctop)
+        for (ctop = 0; ctop < output_dim; ++ctop)//output_dim是输出种类数,psroi输出维:度为:n * output_dim * pooled_height * pooled_width
         {
             for (ph = 0; ph < pooled_height; ++ph)
             {
@@ -69,8 +69,8 @@ void psroi_pool_inner_thread(void* set_args, int pos)
                     bool is_empty = (hend <= hstart) || (wend <= wstart);
                     int gw = pw;
                     int gh = ph;
-                    int c = (ctop*group_size + gh)*group_size + gw;
-                    float out_sum = 0;
+                    int c = (ctop*group_size + gh)*group_size + gw;//位置相关性就是用这个c在一堆score maps选中特定的map,一般group_size,pooled_width,pooled_height这三个数值是相等的;
+                    float out_sum = 0;                        
                     for (h = hstart; h < hend; ++h)
                     {
                         for (w = wstart; w < wend; ++w)
@@ -88,7 +88,6 @@ void psroi_pool_inner_thread(void* set_args, int pos)
                     {
                         top_data[index] = out_sum/bin_area;
                     }
-                    //mapping_channel[index] = c;
                 }
             }
         }
