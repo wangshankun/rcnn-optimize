@@ -1,14 +1,14 @@
 #include "common.h"
-#include"cblas.h"
+#include "cblas.h"
 
-static thread_status_t thread_status[MAX_CPU_NUMBER] __attribute__((aligned(128)));
-static pthread_t     blas_threads [MAX_CPU_NUMBER];
+static thread_status_t thread_status[MAX_CPU_NUMBER_] __attribute__((aligned(128)));
+static pthread_t     blas_threads [MAX_CPU_NUMBER_];
 void   sub_pthread_exec(void);
 
-blas_queue_t  queue[MAX_CPU_NUMBER];
-BLASLONG      range_M[MAX_CPU_NUMBER + 1];
-BLASLONG      range_N[MAX_CPU_NUMBER + 1];
-job_t         job[MAX_CPU_NUMBER];
+blas_queue_t  queue[MAX_CPU_NUMBER_];
+BLASLONG      range_M[MAX_CPU_NUMBER_ + 1];
+BLASLONG      range_N[MAX_CPU_NUMBER_ + 1];
+job_t         job[MAX_CPU_NUMBER_];
 blas_arg_t    execute_arg;
 
 
@@ -61,7 +61,7 @@ static inline int inner_thread(BLASLONG mypos)
     n_to   = range_N[mypos + 1];
 
     N_from = range_N[0];
-    N_to   = range_N[MAX_CPU_NUMBER];
+    N_to   = range_N[MAX_CPU_NUMBER_];
 
     if (beta[0] == 0) BETA_OPERATION(m_from, m_to, N_from, N_to, beta, c, ldc);
   
@@ -78,7 +78,7 @@ static inline int inner_thread(BLASLONG mypos)
         ICOPY_OPERATION(min_l, min_i, a, lda, ls, m_from, sa);
 
         /* Make sure if no one is using buffer */
-        for (i = 0; i < MAX_CPU_NUMBER; i++) while(job[mypos].working[i][CACHE_LINE_SIZE]) {YIELDING;};
+        for (i = 0; i < MAX_CPU_NUMBER_; i++) while(job[mypos].working[i][CACHE_LINE_SIZE]) {YIELDING;};
         for(jjs = n_from; jjs < n_to; jjs += min_jj)
         {
             min_jj = n_to - jjs;
@@ -92,13 +92,13 @@ static inline int inner_thread(BLASLONG mypos)
             KERNEL_OPERATION(min_i, min_jj, min_l, alpha, sa,
                 buffer + min_l * (jjs - n_from), c, ldc, m_from, jjs);
         }
-        for (i = 0; i < MAX_CPU_NUMBER; i++) job[mypos].working[i][CACHE_LINE_SIZE] = (BLASLONG)buffer;
+        for (i = 0; i < MAX_CPU_NUMBER_; i++) job[mypos].working[i][CACHE_LINE_SIZE] = (BLASLONG)buffer;
         WMB;
 
         current = mypos;
         do
         {
-            current++; if (current >= MAX_CPU_NUMBER) current = 0;
+            current++; if (current >= MAX_CPU_NUMBER_) current = 0;
             if (current != mypos)
             {
               /* thread has to wait */
@@ -133,20 +133,20 @@ static inline int inner_thread(BLASLONG mypos)
                     WMB;
                 }
 
-                current ++; if (current >= MAX_CPU_NUMBER) current = 0;
+                current ++; if (current >= MAX_CPU_NUMBER_) current = 0;
             } while (current != mypos);
         }
     }
-    for (i = 0; i < MAX_CPU_NUMBER; i++)  while (job[mypos].working[i][CACHE_LINE_SIZE] ) {YIELDING;};
+    for (i = 0; i < MAX_CPU_NUMBER_; i++)  while (job[mypos].working[i][CACHE_LINE_SIZE] ) {YIELDING;};
 }
 
 void divide(BLASLONG M, BLASLONG* range_M)
 {
-    int dx = M%MAX_CPU_NUMBER;
-    int dy = M/MAX_CPU_NUMBER;
+    int dx = M%MAX_CPU_NUMBER_;
+    int dy = M/MAX_CPU_NUMBER_;
     int index = 0;
     int i;
-    for(i = 0;i < MAX_CPU_NUMBER + 1; i++)
+    for(i = 0;i < MAX_CPU_NUMBER_ + 1; i++)
     {
         range_M[i] = index;
         if(i < dx)
@@ -160,7 +160,7 @@ void divide(BLASLONG M, BLASLONG* range_M)
     }
 }
 
-void sgemm_thread_nn(float* A, float* B, float* C, BLASLONG M, BLASLONG N, BLASLONG K)
+void sgemm_thread_nn_me(float* A, float* B, float* C, BLASLONG M, BLASLONG N, BLASLONG K)
 {
     int i;
     execute_arg.a        = B;
@@ -178,7 +178,7 @@ void sgemm_thread_nn(float* A, float* B, float* C, BLASLONG M, BLASLONG N, BLASL
     ((ROUTINE)(queue[0].routine))(0);
     queue[0].assigned = 0;
 
-    for (i = 0; i < MAX_CPU_NUMBER; i++) while (queue[i].assigned) {YIELDING;};
+    for (i = 0; i < MAX_CPU_NUMBER_; i++) while (queue[i].assigned) {YIELDING;};
 }
 //end about instance matrix compute:
 
@@ -186,7 +186,7 @@ void sgemm_thread_nn(float* A, float* B, float* C, BLASLONG M, BLASLONG N, BLASL
 void sub_pthread_exec(void)
 {
     int pthread_pos;    
-    for(pthread_pos = 1; pthread_pos < MAX_CPU_NUMBER; pthread_pos++)
+    for(pthread_pos = 1; pthread_pos < MAX_CPU_NUMBER_; pthread_pos++)
     {
         if (thread_status[pthread_pos].status == THREAD_STATUS_SLEEP) 
         {
@@ -218,20 +218,20 @@ void sub_pthread_init(void)
 {
     int i, j, pthread_pos;
     
-    for (i = 0; i < MAX_CPU_NUMBER; i++)
+    for (i = 0; i < MAX_CPU_NUMBER_; i++)
     {
         queue[i].sa       = mmap(NULL, BUFFER_SIZE, MMAP_ACCESS, MMAP_POLICY, -1, 0);
         queue[i].sb       = (void *)(((BLASLONG)(queue[i].sa) + ((SGEMM_P * SGEMM_Q * sizeof(float) + GEMM_ALIGN) & ~GEMM_ALIGN)));
         queue[i].assigned = i + 1;
         queue[i].routine  = inner_thread;
         
-        for (j = 0; j < MAX_CPU_NUMBER; j++)
+        for (j = 0; j < MAX_CPU_NUMBER_; j++)
         {
             job[i].working[j][CACHE_LINE_SIZE] = 0;
         }
     }
 
-    for(pthread_pos = 1; pthread_pos < MAX_CPU_NUMBER; pthread_pos++)
+    for(pthread_pos = 1; pthread_pos < MAX_CPU_NUMBER_; pthread_pos++)
     {
         pthread_mutex_init(&thread_status[pthread_pos].lock, NULL);
         pthread_cond_init (&thread_status[pthread_pos].wakeup, NULL);
@@ -243,51 +243,90 @@ void sub_pthread_init(void)
 void sub_pthread_exit(void)
 {
     int i;
-    for (i = 0; i < MAX_CPU_NUMBER; i++)
+    for (i = 0; i < MAX_CPU_NUMBER_; i++)
     {
         munmap(queue[i].sa, BUFFER_SIZE);
     }
 }
 //end about pthread:
 
+void random_matrix(float*buf, int len)
+{
+    int i = 0;
+    srand48(time(0));
+    for ( i = 0; i < len; i++ )
+    {
+       buf[i]= 2.0 * (float)drand48() - 1.0;
+    }
+}
+
+//格式与numpy一致i是列的index; j是行的index
+#define A(j, i) a[ (j)*lda + (i) ]
+#define B(j, i) b[ (j)*ldb + (i) ]
+#define C(j, i) c[ (j)*ldc + (i) ]
+void native_c( int m, int n, int k, float *a, int lda, 
+                                     float *b, int ldb,
+                                     float *c, int ldc )
+{
+    int i, j, p;
+
+    for (j = 0; j < m; j++)
+    {
+        for (i = 0; i < n; i++)
+        {        
+            for (p = 0; p < k; p++)
+            {      
+                C(j, i) = C(j, i) + A(j, p) * B(p, i);
+            }
+        }
+    }
+}
+
 int main()
 {
-    float* abuff = malloc(256 * 2400 * 4);
-    float* bbuff = malloc(7676 * 2400 * 4);
-    float* cbuff = malloc(256 * 7676 * 4);
-    int fd_a, fd_b;
+    float* abuff = malloc(256  * 2400 * 4);
+    float* bbuff = malloc(2400 * 7676 * 4);
+    float* cbuff = malloc(256  * 7676 * 4);
+
+    random_matrix(abuff, 256 * 2400);
+    random_matrix(bbuff, 7676 * 2400);
+
+    int m = 256, n = 7676, k = 2400;
+    int lda = k, ldb = n, ldc = n;
 
     struct timespec start, finish;
     double elapsed;
+
+
+    memset(cbuff, 0 , m * n * sizeof(float));
     
     sub_pthread_init();
-
-    if((fd_a = fopen("./demo_2nd_conv_A","rb")) ==-1)
-    {
-        printf("A creat file wrong!");
-    }
-    if((fd_b = fopen("./demo_2nd_conv_B","rb")) ==-1)
-    {
-        printf("B creat file wrong!");
-    }
-    printf("A read size:%d \r\n",  fread(abuff, 4, 256 * 2400, fd_a));
-    printf("B read size:%d  \r\n", fread(bbuff, 4, 7676 * 2400, fd_b));
-    close(fd_a);
-    close(fd_b);
-    printf("Aabuff:%x  Bbbuff:%x Ccbuff:%x \r\n",abuff,bbuff,cbuff);
     clock_gettime(CLOCK_MONOTONIC, &start);
-    {
-        sgemm_thread_nn(abuff, bbuff, cbuff, 256, 7676, 2400);
-    }
+    sgemm_thread_nn_me(abuff, bbuff, cbuff, 256, 7676, 2400);
     clock_gettime(CLOCK_MONOTONIC, &finish);
     elapsed = (finish.tv_sec - start.tv_sec);
     elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
-    printf("sgemm_thread_nn elapsed time:%f cbuff[128*7676]:%f\r\n",elapsed,cbuff[128*7676]);
+    printf("4 threads sgemm_me elapsed      time:%f cbuff[128*7676]:%f\r\n",elapsed,cbuff[128*7676]);
+    sub_pthread_exit();
 
+    memset(cbuff, 0 , m * n * sizeof(float));
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    native_c( m, n, k, abuff, lda, bbuff, ldb, cbuff, ldc );
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+    printf("single thread native_c elapsed  time:%f cbuff[128*7676]:%f\r\n",elapsed,cbuff[128*7676]);
+
+    memset(cbuff, 0 , m * n * sizeof(float));
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m, n, k, 1.0, abuff, lda, bbuff, ldb, 0.0, cbuff, ldc);
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+    printf("single thread openblas elapsed  time:%f cbuff[128*7676]:%f\r\n",elapsed, cbuff[128*7676]);
+    
     free(abuff);
     free(bbuff);
     free(cbuff);
-    
-    sub_pthread_exit();
     return 0;
 }

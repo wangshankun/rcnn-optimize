@@ -84,8 +84,8 @@
 #define GEMM_UNROLL_M 16
 #define THREAD_STATUS_SLEEP 2
 #define THREAD_STATUS_WAKEUP 4
-#define MAX_CPU_NUMBER 8
-#define MAX_SUB_PTHREAD_INDEX 7
+#define MAX_CPU_NUMBER_ 4
+#define MAX_SUB_PTHREAD_INDEX 3
 #define COMPSIZE 1
 
 int sgemm_kernel(BLASLONG, BLASLONG, BLASLONG, float,  float  *, float  *, float  *, BLASLONG);
@@ -110,7 +110,7 @@ FLOAT * SHOW;
 
 
 typedef struct {
-  volatile BLASLONG working[MAX_CPU_NUMBER][CACHE_LINE_SIZE];
+  volatile BLASLONG working[MAX_CPU_NUMBER_][CACHE_LINE_SIZE];
 } job_t;
 
 typedef struct {

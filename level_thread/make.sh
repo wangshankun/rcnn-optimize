@@ -5,9 +5,13 @@ gcc -g -DMAX_STACK_ALLOC=2048 -Wall -m64 -DF_INTERFACE_GFORT -fPIC -DSMP_SERVER 
 gcc -g -DMAX_STACK_ALLOC=2048 -Wall -m64 -DF_INTERFACE_GFORT -fPIC -DSMP_SERVER -DNO_WARMUP -DMAX_CPU_NUMBER=8 -DASMNAME=sgemm_oncopy -DASMFNAME=sgemm_oncopy_ -DNAME=sgemm_oncopy_ -DCNAME=sgemm_oncopy -DCHAR_NAME=\"sgemm_oncopy_\" -DCHAR_CNAME=\"sgemm_oncopy\" -DNO_AFFINITY -I.. -UDOUBLE  -UCOMPLEX -c -UDOUBLE -UCOMPLEX ./gemm_ncopy_4.c -o sgemm_oncopy.o
 gcc -g -DMAX_STACK_ALLOC=2048 -Wall -m64 -DF_INTERFACE_GFORT -fPIC -DSMP_SERVER -DNO_WARMUP -DMAX_CPU_NUMBER=8 -DASMNAME=sgemm_kernel -DASMFNAME=sgemm_kernel_ -DNAME=sgemm_kernel_ -DCNAME=sgemm_kernel -DCHAR_NAME=\"sgemm_kernel_\" -DCHAR_CNAME=\"sgemm_kernel\" -DNO_AFFINITY -I.. -UDOUBLE  -UCOMPLEX -c -UDOUBLE -UCOMPLEX ./sgemm_kernel_16x4_haswell.S -o sgemm_kernel.o
 
-ar  -ru libspopenblas.a  sgemm_beta.o sgemm_itcopy.o sgemm_oncopy.o sgemm_kernel.o
+ar  -r libspopenblas.a  sgemm_beta.o sgemm_itcopy.o sgemm_oncopy.o sgemm_kernel.o
 
 ranlib  libspopenblas.a
 
-gcc -O3 -w  -o  test thread_level3.c -lpthread -static -L./ -lspopenblas
+gcc -O3 -w thread_level3.c -static -L./ -lspopenblas -I/opt/OpenBLAS/include/ -L/opt/OpenBLAS/lib/ -lopenblas -lpthread -o  test
 
+export OPENBLAS_NUM_THREADS=1
+./test
+
+rm -rf *.o *.a test
