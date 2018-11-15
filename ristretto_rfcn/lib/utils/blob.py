@@ -7,16 +7,16 @@
 
 """Blob helper functions."""
 
-from imgaug import augmenters as iaa
+#from imgaug import augmenters as iaa
 import numpy as np
 import random
 import cv2
 
-seq2 = iaa.Sharpen(alpha=(0.5, 1.0), lightness=(0.5, 2.0))
-seq4 = iaa.Add((-60, -30))
-seq8 = iaa.Superpixels(p_replace=(0.1, 0.11), n_segments=(16, 9))
-seq9 = iaa.AverageBlur(k=(10, 10))
-iaalist = [seq4, seq2, seq8, seq9]
+#seq2 = iaa.Sharpen(alpha=(0.5, 1.0), lightness=(0.5, 2.0))
+#seq4 = iaa.Add((-60, -30))
+#seq8 = iaa.Superpixels(p_replace=(0.1, 0.11), n_segments=(16, 9))
+#seq9 = iaa.AverageBlur(k=(10, 10))
+#iaalist = [seq4, seq2, seq8, seq9]
 
 def im_list_to_blob(ims):
     """Convert a list of images into a network input.
