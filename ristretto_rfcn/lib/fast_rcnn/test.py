@@ -227,7 +227,7 @@ def im_detect(net, im, boxes=None):
     else:
         forward_kwargs['rois'] = blobs['rois'].astype(np.float32, copy=False)
     blobs_out = net.forward(**forward_kwargs)
-    np.save("./conv1_weight.npy",net.params['conv1'][0].data)
+    #np.save("./conv1_weight.npy",net.params['conv1'][0].data)
 
     if cfg.TEST.HAS_RPN:
         assert len(im_scales) == 1, "Only single-image batch implemented"
