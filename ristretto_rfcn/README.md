@@ -9,7 +9,9 @@
 
 
 环境变量：因为ristretto 需要调用python，既c++调python，因此python使用的环境变量必须导入
+
     export PYTHONPATH=./caffe/python:$PYTHONPATH
+    
     export PYTHONPATH=./lib:$PYTHONPATH
 
 因为安装了anaconda，与系统自带的python冲突，因此修改可执行路径环境变量，排除掉anaconda的python路径
@@ -26,3 +28,10 @@ export PATH=/usr/local/cuda-         8.0/bin:/usr/local/sbin:/usr/local/bin:/usr
 caffe代码https://github.com/BVLC/caffe
 Ristretto caffe代码https://github.com/pmgysel/caffe
 将ristretto实现的代码移植到faster rcnn代码中
+
+=================================================================================
+增加了对cpu版本的支持
+在微软caffe的基础上引入一些intel caffe layer的cpu 实现逻辑(编译选项加入c++11)；
+intel 作为cpu厂商会有优先支持cpu 逻辑的实现，因此如果找不到cpu的实现逻辑可以去intel的caffe找找；
+但是intel caffe很多不必要的实现，比如intel 自己的mkl_cdnn，mkl gemm等等···因此还是需要基于相对
+干净的微软版本去实现cpu的rfcn训练；
