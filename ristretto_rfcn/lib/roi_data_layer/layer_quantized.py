@@ -9,6 +9,9 @@
 
 RoIDataLayer implements a Caffe Python layer.
 """
+import sys
+sys.path.insert(0, sys.path[1] + '/caffe/python')
+sys.path.insert(0, sys.path[0])
 
 import caffe
 from fast_rcnn.config import cfg
