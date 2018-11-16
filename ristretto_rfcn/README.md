@@ -37,10 +37,21 @@ Ristretto caffe代码https://github.com/pmgysel/caffe
 intel 作为cpu厂商会有优先支持cpu 逻辑的实现，因此如果找不到cpu的实现逻辑可以去intel的caffe找找
 但是intel caffe很多不必要的实现，比如intel 自己的mkl_cdnn，mkl gemm等等···因此还是需要基于相对
 干净的微软版本去实现cpu的rfcn训练。
+纯cpu版本
+cp  ./lib/setup_cpu_only.py  ./lib/setup.py                       
+cp  ./lib/fast_rcnn/nms_wrapper_cpu_only.py ./lib/fast_rcnn/nms_wrapper.py
+cp  ./caffe/Makefile.config.cpu_only ./caffe/Makefile.config
+支持gpu版本
+cp  ./lib/setup_gpu_support.py  ./lib/setup.py                       
+cp  ./lib/fast_rcnn/nms_wrapper_gpu_support.py ./lib/fast_rcnn/nms_wrapper.py
+cp  ./caffe/Makefile.config.gpu_support ./caffe/Makefile.config 
 
-================================================================================================
- ./lib/setup_cpu_only.py                        
- ./lib/fast_rcnn/nms_wrapper_cpu_only.py
- ./caffe/Makefile.config.cpu_only
-
- 
+cd caffe 
+make -j8
+make pycaffe
+cd ..
+cd lib
+make
+cd ..
+chmod a+x ./example.sh
+python example.sh
