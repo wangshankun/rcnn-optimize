@@ -101,6 +101,7 @@ for split in ['train', 'test']:
 def get_imdb(name):
     """Get an imdb (image database) by name."""
     # __sets['PersonTrain'] = (lambda imageset = imageset, devkit = devkit: datasets.inria(imageset,devkit))
+    print "get imdb name:%s"%name
     if not __sets.has_key(name):
         raise KeyError('Unknown dataset: {}'.format(name))
     return __sets[name]()
