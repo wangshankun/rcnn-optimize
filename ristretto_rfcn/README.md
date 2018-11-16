@@ -55,4 +55,4 @@ cd lib
 make  
 cd ..  
 chmod a+x ./example.sh  
-python example.sh  
+./example.sh  
