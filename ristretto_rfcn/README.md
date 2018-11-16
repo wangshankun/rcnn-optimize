@@ -1,5 +1,5 @@
 1.先评估原始网络，生成quantized.prototxt里面有对定点层修改
-./caffe/build/tools/ristretto quantize --model=./train_zf_rfcn.prototxt --weights=./rfcn/normal/gs_roi_rpn.caffemodel --model_quantized=./quantized.prototxt --iterations=100 --gpu=0 --trimming_mode=dynamic_fixed_point --error_margin=3
+./caffe/build/tools/ristretto quantize --model=./train_zf_rfcn.prototxt --weights=./rfcn/normal/gs_roi_rpn.caffemodel --model_quantized=./quantized.prototxt --iterations=100 **--gpu=0** --trimming_mode=dynamic_fixed_point --error_margin=3
 
 cpu执行的命令
 ./caffe/build/tools/ristretto quantize --model=./train_zf_rfcn.prototxt --weights=./rfcn/normal/gs_roi_rpn.caffemodel --model_quantized=./quantized.prototxt --iterations=100 --trimming_mode=dynamic_fixed_point --error_margin=3
