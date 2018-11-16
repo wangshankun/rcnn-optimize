@@ -66,9 +66,8 @@ class gs_plate_roi(imdb):
         """
         Load the indexes listed in this dataset's image set file.
         """
-        print "=================================================="
+        print "====================_load_image_set_index======================="
         print self._data_path
-        print "=================================================="
 
         image_set_file = os.path.join(self._data_path, 'ImageSets', 'Main',
                                       self._image_set + '.txt')
