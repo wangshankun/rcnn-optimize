@@ -1,6 +1,9 @@
 1.先评估原始网络，生成quantized.prototxt里面有对定点层修改
 ./caffe/build/tools/ristretto quantize --model=./train_zf_rfcn.prototxt --weights=./rfcn/normal/gs_roi_rpn.caffemodel --model_quantized=./quantized.prototxt --iterations=100 --gpu=0 --trimming_mode=dynamic_fixed_point --error_margin=3
 
+cpu执行的命令
+./caffe/build/tools/ristretto quantize --model=./train_zf_rfcn.prototxt --weights=./rfcn/normal/gs_roi_rpn.caffemodel --model_quantized=./quantized.prototxt --iterations=100 --trimming_mode=dynamic_fixed_point --error_margin=3
+
 降低error_margin 增加iterations次数
 ./caffe/build/tools/ristretto quantize --model=./train_zf_rfcn.prototxt --weights=./rfcn/normal/gs_roi_rpn.caffemodel --model_quantized=./quantized.prototxt --iterations=2000 --gpu=0 --trimming_mode=dynamic_fixed_point --error_margin=0.5
 
@@ -30,8 +33,14 @@ Ristretto caffe代码https://github.com/pmgysel/caffe
 将ristretto实现的代码移植到faster rcnn代码中
 
 =================================================================================
-增加了对cpu版本的支持
-在微软caffe的基础上引入一些intel caffe layer的cpu 实现逻辑(编译选项加入c++11)；
-intel 作为cpu厂商会有优先支持cpu 逻辑的实现，因此如果找不到cpu的实现逻辑可以去intel的caffe找找；
+增加了对cpu版本的支持在微软caffe的基础上引入一些intel caffe layer的cpu 实现逻辑(编译选项加入c++11)
+intel 作为cpu厂商会有优先支持cpu 逻辑的实现，因此如果找不到cpu的实现逻辑可以去intel的caffe找找
 但是intel caffe很多不必要的实现，比如intel 自己的mkl_cdnn，mkl gemm等等···因此还是需要基于相对
-干净的微软版本去实现cpu的rfcn训练；
+干净的微软版本去实现cpu的rfcn训练。
+
+================================================================================================
+ ./lib/setup_cpu_only.py                        
+ ./lib/fast_rcnn/nms_wrapper_cpu_only.py
+ ./caffe/Makefile.config.cpu_only
+
+ 
