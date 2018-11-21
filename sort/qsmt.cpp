@@ -18,8 +18,7 @@ pthread_mutex_t threadMutex;
 int GetThreadNumber()
 {
     /* 快速判断是否还有线程需要创建 */
-    if(threadIndex >= ThreadCount)
-        return -1;
+    if(threadIndex >= ThreadCount) return -1;
     int threadNumber;
     pthread_mutex_lock(&threadMutex);
     /* 有可能在获得锁之后，threadIndex已经被其他线程修改过，所以务必检查一次 */
