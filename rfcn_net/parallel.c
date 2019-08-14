@@ -51,7 +51,7 @@ void all_sub_pthread_exec(queue_t *queue_Q, int exec_thread_num)
     if(exec_thread_num > MAX_CPU_NUMBER) exec_thread_num = MAX_CPU_NUMBER;
     for(pthread_pos = 0; pthread_pos < exec_thread_num - 1; pthread_pos++)
     {
-        if(queue_Q[pthread_pos + 1].routine)
+        if(queue_Q[pthread_pos + 1].routine)//从queue_Q[1]开始，这是唤醒子程序过程，而子程序从1开始计数
         {
             WMB;
             sub_thread_status[pthread_pos].queue = &(queue_Q[pthread_pos + 1]);
@@ -60,12 +60,12 @@ void all_sub_pthread_exec(queue_t *queue_Q, int exec_thread_num)
             {
                 pthread_mutex_lock  (&sub_thread_status[pthread_pos].lock);
                 sub_thread_status[pthread_pos].status = THREAD_STATUS_WAKEUP;
-                pthread_cond_signal(&sub_thread_status[pthread_pos].wakeup);
+                pthread_cond_signal(&sub_thread_status[pthread_pos].wakeup);//唤醒的子程序在死循环的sub_pthread_body中(routine)(queue -> args, queue -> position)执行
                 pthread_mutex_unlock(&sub_thread_status[pthread_pos].lock);
             }
         }
     }
-    if(queue_Q[0].routine)
+    if(queue_Q[0].routine)//queue_Q[0]是从主程序继承而来，接着主程序逻辑运行，并在最后while等待其他子程序归来
     {
         void (*routine)(void *, int) = queue_Q[0].routine;
         (routine)(queue_Q[0].args, queue_Q[0].position);
