@@ -230,7 +230,8 @@ int BatchGpuResize::DoResize(ImgType img_type,  NppiInterpolationMode resize_typ
 
 int main()
 {
-    #define test_batch 8
+    #define test_batch 8//npp batch 接口最小batch size是2,,如果只有一张图是会error的
+    #define max_batch 8
     #define RES_W 512
     #define RES_H 512
     vector <Mat> src_mat_v;
@@ -249,7 +250,7 @@ int main()
     }
     
     BatchGpuResize test;
-    test.Init(test_batch);
+    test.Init(max_batch);
 
     for (int i = 0; i < test_batch; i++)
     {
