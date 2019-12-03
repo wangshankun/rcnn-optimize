@@ -54,8 +54,8 @@ int main()
     NppiSize image_b_size = {.width = DST_SIZE_W, .height = DST_SIZE_H};
     NppiRect image_b_roi = {.x = 0, .y = 0, .width = DST_SIZE_W, .height = DST_SIZE_H};
     Npp8u* image_b = nppiMalloc_8u_C3(DST_SIZE_W, DST_SIZE_H, &image_b_pitch);
-    //cudaMallocPitch(&image_b,&((size_t)image_b_pitch),(size_t)(DST_SIZE_W*3),(size_t)DST_SIZE_H);
     
+
     /* 建目标图 */
     Mat dst_mat;
     dst_mat.create(DST_SIZE_H, DST_SIZE_W, org_img_mat.type());
