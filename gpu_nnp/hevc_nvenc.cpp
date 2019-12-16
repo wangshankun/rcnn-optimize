@@ -1,4 +1,5 @@
 //https://www.cnblogs.com/betterwgo/p/6843390.html
+//https://blog.csdn.net/leixiaohua1020/article/details/39770947
 //GPU 硬件h265编码
 //ffmpeg -i %04d.jpg -crf 28 -c:v hevc_nvenc -pix_fmt yuv420p -f hevc bitstream.265
 //ffmpeg -s 480x272 -i ds_480x272.yuv  -crf 28 -c:v hevc_nvenc -pix_fmt yuv420p -f hevc bitstream.265
