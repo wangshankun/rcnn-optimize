@@ -15,15 +15,18 @@ struct CompressInputImage {
     buf_len:       u64,
 }
 
-fn main()
+fn compress_images(vec_cmp_in: &mut Vec<CompressInputImage>)
 {
 
-    println!("Integer: {}",  thread_rng().gen_range(1, 4));
+    println!(" {} {}", vec_cmp_in[3].image_id, vec_cmp_in[3].channel_id);
+}
 
+fn main()
+{
     let mut vec_cmp_in :Vec<CompressInputImage> = Vec::new();
     for idx_img in 100..109
     {
-        println!("{} {}", file!(), line!()); //行号，文件文件名
+        //println!("{} {}", file!(), line!()); //行号，文件文件名
         let img_name    = idx_img.to_string() + ".jpg";//100.jpg  .. 108.jpg
         let mut file    = File::open(img_name).expect("file not found");
         let mut buffer  = Vec::<u8>::new();
@@ -47,7 +50,9 @@ fn main()
 
         //println!("cp1 is {:?}", cp1);
         vec_cmp_in.push(cp1);
-        println!("Vector length: {}", vec_cmp_in.len());
+        //println!("Vector length: {}", vec_cmp_in.len());
     }
-    println!(" {} {}", vec_cmp_in[3].image_id, vec_cmp_in[3].channel_id);
+    //println!(" {} {}", vec_cmp_in[3].image_id, vec_cmp_in[3].channel_id);
+
+   compress_images(&mut vec_cmp_in);
 }
