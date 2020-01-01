@@ -1,5 +1,9 @@
 use std::fs::File;
 use std::io::prelude::*;
+
+extern crate rand;
+use rand::{Rng, thread_rng};
+
 #[derive(Debug)]
 struct CompressInputImage {
     image_id:      String,
@@ -13,6 +17,9 @@ struct CompressInputImage {
 
 fn main()
 {
+
+    println!("Integer: {}",  thread_rng().gen_range(1, 4));
+
     let mut vec_cmp_in :Vec<CompressInputImage> = Vec::new();
     for idx_img in 100..109
     {
@@ -27,9 +34,10 @@ fn main()
             Err(..) => println!("file read_to_end error")
         }
 
+        let rand_inx = thread_rng().gen_range(1, 4);//随机channel id给例子中使用
         let cp1 = CompressInputImage { 
                       image_id:      "1000_9919".to_string() + &idx_img.to_string(),
-                      channel_id:    "hangzhou_0192_1".to_string(),
+                      channel_id:    "hangzhou_0192_1".to_string() + &rand_inx.to_string(),
                       ts_ms:         1212212 + idx_img,
                       compress_rate: 16,
                       image_format:  0,
@@ -41,5 +49,5 @@ fn main()
         vec_cmp_in.push(cp1);
         println!("Vector length: {}", vec_cmp_in.len());
     }
-    println!(" {}", vec_cmp_in[3].image_id);
+    println!(" {} {}", vec_cmp_in[3].image_id, vec_cmp_in[3].channel_id);
 }
