@@ -1,10 +1,11 @@
 use std::fs::File;
 use std::io::prelude::*;
+use std::collections::HashMap;
 
 extern crate rand;
 use rand::{Rng, thread_rng};
 
-#[derive(Debug)]
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct CompressInputImage {
     image_id:      String,
     channel_id:    String,
@@ -15,10 +16,52 @@ struct CompressInputImage {
     buf_len:       u64,
 }
 
-fn compress_images(vec_cmp_in: &mut Vec<CompressInputImage>)
+fn compress_images(vec_cmp_in: &Vec<CompressInputImage>)
 {
+//    println!(" {} {}", vec_cmp_in[3].image_id, vec_cmp_in[3].channel_id);
 
-    println!(" {} {}", vec_cmp_in[3].image_id, vec_cmp_in[3].channel_id);
+    let mut channel_hit_list:HashMap<&String, Vec<&CompressInputImage>> = HashMap::new();   
+
+    for x in vec_cmp_in
+    {   //如果遇到不存在channel id那么就创建一个新的img收集器，把这个img放到收集器中；
+        //如果存在就直接放到已经存channel id对应的收集器中
+        channel_hit_list.entry(&x.channel_id).or_insert(Vec::<&CompressInputImage>::new()).push(x);
+    }
+    //println!("{:?}", channel_hit_list);
+
+//    println!("{}", channel_hit_list.len());//三个不同channel id
+//    println!("{}", channel_hit_list[&"hangzhou_0192_13".to_string()].len());//属于13 id 的成员有几个
+//    println!("{}", channel_hit_list[&"hangzhou_0192_12".to_string()].len());//属于12 id 的成员有几个
+//    println!("{}", channel_hit_list[&"hangzhou_0192_11".to_string()].len());//属于11 id 的成员有几个
+/*
+    for (key, mut val) in channel_hit_list
+    {
+         println!("channel id :{} have {} members", key, val.len());
+         for x in &val
+         {
+              println!("{}",x.ts_ms);
+         }
+
+         println!("根据时间戳逆序排列");
+         val.sort_by(|a, b| b.ts_ms.cmp(&a.ts_ms));
+
+         for x in &val
+         {
+              println!("{}",x.ts_ms);
+         }
+    }
+*/
+    for (key, mut val) in channel_hit_list
+    {
+         println!("channel id :{} have {} members", key, val.len());
+         //让成员按照时间戳顺序从小到大排列
+         val.sort_by(|a, b| a.ts_ms.cmp(&b.ts_ms));
+         for x in &val
+         {
+              println!("{}",x.ts_ms);
+         }
+    }
+
 }
 
 fn main()
@@ -54,5 +97,5 @@ fn main()
     }
     //println!(" {} {}", vec_cmp_in[3].image_id, vec_cmp_in[3].channel_id);
 
-   compress_images(&mut vec_cmp_in);
+   compress_images(&vec_cmp_in);
 }
