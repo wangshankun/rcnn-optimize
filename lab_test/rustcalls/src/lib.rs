@@ -1,6 +1,7 @@
 use std::ffi::{c_void, CStr};
 use std::os::raw::c_char;
 use std::slice;
+use ffi_support::ByteBuffer;
 
 // A Rust struct mapping the C struct
 #[repr(C)]
@@ -10,6 +11,19 @@ pub struct RustStruct {
     pub ul: u64,
     pub c_string: *const c_char,
 }
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct CompressInputImage {
+    pub image_id:      *const c_char,
+    pub channel_id:    *const c_char,
+    pub ts_ms:         u64,
+    pub compress_rate: i32,
+    pub image_format:  i32,
+    pub buf:           *mut u8,
+    pub buf_len:       u64,
+}
+
 
 macro_rules! create_function {
     // This macro takes an argument of designator `ident` and
@@ -88,4 +102,44 @@ pub unsafe extern "C" fn rust_cstruct(c_struct: *mut RustStruct) {
         "rust_cstruct() is called, values passed = <{} {} {}>",
         rust_struct.c, rust_struct.ul, s
     );
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn rust_buffer(c_buf: ByteBuffer) {
+    //let test     = ByteBuffer::from_vec(vec![1,2,3,4,5,6]);
+    //println!("{:?}",test.into_vec());
+    let mut rust_vec = c_buf.into_vec();
+    rust_vec.push(66);
+    println!("{:?}",rust_vec);
+}
+
+
+#[no_mangle]
+pub unsafe extern "C" fn rust_copimg(cimg: *mut CompressInputImage) {
+    let rust_struct = &*cimg;
+    let s = CStr::from_ptr(rust_struct.image_id)
+        .to_string_lossy()
+        .into_owned();
+
+    println!("{} {} ",s ,rust_struct.buf_len);
+
+    let rust_array: Vec<u8> = Vec::from_raw_parts(rust_struct.buf, rust_struct.buf_len as usize, rust_struct.buf_len as usize);
+    //let rust_array: &[u8] =  slice::from_raw_parts(rust_struct.buf, rust_struct.buf_len as usize);
+    println!("{:?}",rust_array);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn rust_copimg_array(cimgs: *mut CompressInputImage, len: usize) {
+   // let copimg_array = &*cimgs;
+    let rust_array: &[CompressInputImage] = slice::from_raw_parts(cimgs, len as usize);
+    //let rust_array: Vec<CompressInputImage> = Vec::from_raw_parts(cimgs, len as usize, len as usize);
+    println!("{:?}",rust_array); 
+
+    let s = CStr::from_ptr(rust_array[0].image_id).to_string_lossy() .into_owned();
+
+    println!("{} {} ",s ,rust_array[0].buf_len);
+
+    let img_buf: &[u8] =  slice::from_raw_parts(rust_array[0].buf, rust_array[0].buf_len as usize);
+
+    println!("{:?}",img_buf);
 }

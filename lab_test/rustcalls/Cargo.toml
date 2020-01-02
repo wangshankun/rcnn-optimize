@@ -11,3 +11,4 @@ name = "rustcalls"
 crate-type =["cdylib"]
 
 [dependencies]
+ffi-support = "0.3.5"#测试ByteBuffer使用
