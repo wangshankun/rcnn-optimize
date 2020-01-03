@@ -1,4 +1,5 @@
-use std::ffi::{c_void, CStr};
+#![feature(vec_into_raw_parts)]
+use std::ffi::{c_void, CStr, CString};
 use std::os::raw::c_char;
 use std::slice;
 use ffi_support::ByteBuffer;
@@ -24,6 +25,14 @@ pub struct CompressInputImage {
     pub buf_len:       u64,
 }
 
+#[repr(C)]
+#[derive(Debug)]
+pub struct CompressOutputData {
+    pub channel_ids:   *const c_char,
+    pub image_ids:     *const c_char,
+    pub ts_arrays:     *const c_char,
+    pub offsets:       *const c_char,
+}
 
 macro_rules! create_function {
     // This macro takes an argument of designator `ident` and
@@ -142,4 +151,30 @@ pub unsafe extern "C" fn rust_copimg_array(cimgs: *mut CompressInputImage, len: 
     let img_buf: &[u8] =  slice::from_raw_parts(rust_array[0].buf, rust_array[0].buf_len as usize);
 
     println!("{:?}",img_buf);
+}
+
+
+#[no_mangle]
+pub unsafe extern "C" fn compress_images() -> *const CompressOutputData
+{
+let mut ret_vec:Vec<CompressOutputData> = vec![];
+let ret = CompressOutputData
+                  {
+                      channel_ids:CString::new("addfsdf").unwrap().into_raw(),
+                      image_ids:CString::new("addfsdf").unwrap().into_raw(),
+                      ts_arrays:CString::new("addfsdf").unwrap().into_raw(),
+                      offsets:CString::new("addfsdf").unwrap().into_raw(),
+                  };
+let ret1 = CompressOutputData
+                  {
+                      channel_ids:CString::new("1addfsdf").unwrap().into_raw(),
+                      image_ids:CString::new("1addfsdf").unwrap().into_raw(),
+                      ts_arrays:CString::new("1addfsdf").unwrap().into_raw(),
+                      offsets:CString::new("1addfsdf").unwrap().into_raw(),
+                  };
+ret_vec.push(ret);
+ret_vec.push(ret1);
+//ret_vec.as_ptr()
+let (ptr, len, cap) = ret_vec.into_raw_parts();
+ptr
 }
