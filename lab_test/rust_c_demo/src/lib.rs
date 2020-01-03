@@ -45,12 +45,13 @@ pub unsafe extern "C" fn compress_images(cimgs:*mut CompressInputImage, len:usiz
     let cm_img_array: &[CompressInputImage] = slice::from_raw_parts(cimgs, len as usize);
     //print_type_of(&cm_img_array);
 
-    let mut channel_hit_list:HashMap<&*mut u8, Vec<&CompressInputImage>> = HashMap::new();
+    let mut channel_hit_list:HashMap<String, Vec<&CompressInputImage>> = HashMap::new();
 
     for x in cm_img_array
     {   //如果遇到不存在channel id那么就创建一个新的img收集器，把这个img放到收集器中；
         //如果存在就直接放到已经存channel id对应的收集器中
-        channel_hit_list.entry(&x.channel_id).or_insert(Vec::<&CompressInputImage>::new()).push(x);
+        let c_id = CStr::from_ptr(x.channel_id as *const i8).to_str().unwrap().to_owned();
+        channel_hit_list.entry(c_id).or_insert(Vec::<&CompressInputImage>::new()).push(x);
     }
 
     //println!("{:?}",channel_hit_list);
@@ -63,7 +64,7 @@ pub unsafe extern "C" fn compress_images(cimgs:*mut CompressInputImage, len:usiz
          //让包内成员按照时间戳顺序从小到大排列
          val.sort_by(|a, b| a.ts_ms.cmp(&b.ts_ms));
 
-         let ch_ids = CStr::from_ptr(*key as *const i8).to_str().unwrap().to_owned();
+         let ch_ids                 = key;
          let mut im_vec:Vec<String> = vec![];
          let mut ts_vec:Vec<u64>    = vec![];
          let mut of_vec:Vec<u64>    = vec![];
@@ -89,7 +90,7 @@ pub unsafe extern "C" fn compress_images(cimgs:*mut CompressInputImage, len:usiz
          let of_ids_v:Vec<_> = of_vec.iter().map(ToString::to_string).collect();
          let of_ids = of_ids_v.join(";");
 
-//      println!("打包  {:?} {:?} {:?} {} {:?}",im_ids,ts_ids,of_ids,data.len(),data);
+        //println!("打包  {:?} {:?} {:?} {} ",im_ids,ts_ids,of_ids,data.len());
         let ret = CompressOutputData
                   {
                       //channel_ids:*key as *const i8,//这种方式在C语言调用free(channel_ids)会崩掉
