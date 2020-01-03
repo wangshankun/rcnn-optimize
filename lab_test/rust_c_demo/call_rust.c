@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+#include <time.h>
 
 void print_hex_str(const void* buf , size_t size)
 {
@@ -91,8 +92,18 @@ int main()
     memset(tts[2].buf,'c',22);
     tts[2].buf_len      = 22;
 
+       	 double elapsed;
+       	 struct timespec start, finish;
+       	 clock_gettime(CLOCK_MONOTONIC, &start);
+
     unsigned long ret_num = 0;
     CompressOutputData* cpdatas = compress_images(tts, 3, 16, 0, &ret_num);
+
+       	clock_gettime(CLOCK_MONOTONIC, &finish);
+        elapsed = (finish.tv_sec - start.tv_sec);
+        elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+        printf("\t\t\tfun call elapsed time:%f\r\n",elapsed);
+
     printf("ret num: %d \r\n",ret_num);
 
     for(unsigned long i = 0; i < ret_num; i++)
