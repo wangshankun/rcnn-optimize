@@ -1,4 +1,3 @@
-///package com.alibaba.damo.shic;
 import java.util.Arrays;
 import java.util.List;
 
