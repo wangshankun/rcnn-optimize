@@ -1,10 +1,16 @@
 [package]
-name = "v1"
+name = "rustcalls"
 version = "0.1.0"
-authors = ["朴珞 <shankun.shankunwan@alibaba-inc.com>"]
+authors = [shankun]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name = "rustcalls"
+crate-type =["cdylib"]
+
 [dependencies]
-rand="0.5.0-pre.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
