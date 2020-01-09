@@ -5,6 +5,8 @@
 #include "nvJPEG_helper.hpp"
 #include<time.h>
 
+#define CUDA_FRAME_ALIGNMENT 256.0
+
 bool is_interleaved(nvjpegOutputFormat_t format)
 {
     if (format == NVJPEG_OUTPUT_RGBI || format == NVJPEG_OUTPUT_BGRI)
@@ -75,7 +77,9 @@ int test()
     }
     checkCudaErrors(nvjpegEncoderParamsSetSamplingFactors(encode_params, subsampling, NULL));
     
-    cudaError_t eCopy = cudaMalloc(&pBuffer, widths[0] * heights[0] * NVJPEG_MAX_COMPONENT);
+    unsigned int linesize = (int)(widths[0]/CUDA_FRAME_ALIGNMENT + 1) * CUDA_FRAME_ALIGNMENT;
+
+    cudaError_t eCopy = cudaMalloc(&pBuffer, linesize * heights[0] * NVJPEG_MAX_COMPONENT);
     if(cudaSuccess != eCopy) 
     {
         std::cerr << "cudaMalloc failed for component Y: " << cudaGetErrorString(eCopy) << std::endl;
@@ -86,25 +90,51 @@ int test()
     {
         {
             pBuffer,
-            pBuffer + widths[0]*heights[0],
-            pBuffer + widths[0]*heights[0]*2,
-            pBuffer + widths[0]*heights[0]*3
+            pBuffer + linesize*heights[0],
+            pBuffer + linesize*heights[0]*2,
+            pBuffer + linesize*heights[0]*3
         },
         {
-            (unsigned int)(is_interleaved(output_format) ? widths[0] * 3 : widths[0]),
-            (unsigned int)widths[0],
-            (unsigned int)widths[0],
-            (unsigned int)widths[0]
+            (unsigned int)(linesize),
+            (unsigned int)(linesize/2),
+            (unsigned int)(linesize/2),
+            (unsigned int)(linesize/2)
+
         }
     };
-   
+/*
+            cudaError_t eCopy = cudaMalloc(&pBuffer, widths[0] * heights[0] * NVJPEG_MAX_COMPONENT);
+            if(cudaSuccess != eCopy)
+            {
+                std::cerr << "cudaMalloc failed for component Y: " << cudaGetErrorString(eCopy) << std::endl;
+                return 1;
+            }
+
+            nvjpegImage_t imgdesc =
+            {
+                {
+                    pBuffer,
+                   pBuffer + widths[0]*heights[0],
+                   pBuffer + widths[0]*heights[0]*2,
+                   pBuffer + widths[0]*heights[0]*3
+                },
+                {
+                   (unsigned int)(is_interleaved(output_format) ? widths[0] * 3 : widths[0]),
+                   (unsigned int)widths[0],
+                   (unsigned int)widths[0],
+                   (unsigned int)widths[0]
+                }
+            };
+  */ 
+
     int nReturnCode = 0;
     cudaDeviceSynchronize();
+
     nReturnCode = nvjpegDecode(nvjpeg_handle, jpeg_state, (const unsigned char*)(file_data[0].data()), file_len[0], output_format, &imgdesc, NULL);
     cudaDeviceSynchronize();
     if(nReturnCode != 0)
     {
-        std::cerr << "Error in nvjpegDecode." << std::endl;
+        std::cerr << "Error in nvjpegDecode. " <<  nReturnCode <<  std::endl;
         return 1;
     }
 
