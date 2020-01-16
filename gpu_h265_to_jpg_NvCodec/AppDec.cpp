@@ -17,13 +17,11 @@
 #include <cuda_runtime.h>
 #include <nppi_geometry_transforms.h>
 #include <nppi_support_functions.h>
-#include "NvDecoder/NvDecoder.h"
+#include "NvDecoder.h"
+
 #include "../Utils/NvCodecUtils.h"
 #include "../Utils/FFmpegDemuxer.h"
-#include "opencv2/opencv.hpp"
 
-
-using namespace cv;
 using namespace std;
 
 #define CUDA_FRAME_ALIGNMENT 256.0
@@ -53,8 +51,74 @@ int dev_free(void *p)
     return (int)cudaFree(p);
 }
 
+#define savefile(name, buffer, size) do\
+{\
+  FILE *out = fopen(name, "wb");\
+  if(out != NULL)\
+  {\
+        fwrite (buffer , sizeof(char), size, out);\
+        fclose (out);\
+  }\
+} while(0)
+
+#define readfile(name, buffer, size) do\
+{\
+  FILE *out = fopen(name, "rb");\
+  if(out != NULL)\
+  {\
+        fread (buffer , sizeof(char), size, out);\
+        fclose (out);\
+  }\
+} while(0)
+
+
+class FFmpegBuf:public FFmpegDemuxer::DataProvider 
+{
+    public:
+        uint8_t* _src_buf;
+        int      _max_size;
+        int      _has_read_size;
+        
+        int GetData(uint8_t *pBuf, int nBuf)
+        {
+            if (_has_read_size + nBuf <= _max_size)
+            {
+                memcpy(pBuf, _src_buf + _has_read_size, nBuf);
+                _has_read_size = _has_read_size + nBuf;
+                return nBuf;
+            }
+            else if (_has_read_size < _max_size)
+            {
+                int res_size =  _max_size - _has_read_size;
+                memcpy(pBuf, _src_buf + _has_read_size, res_size);
+                _has_read_size = _max_size;
+                return res_size;
+            }
+            else
+            {
+                return -1;//EOF标志
+            }
+        }
+        
+        FFmpegBuf(uint8_t* src_buf, int max_size)
+        {
+            _src_buf       = src_buf;
+            _max_size      = max_size;
+            _has_read_size = 0;
+        }
+        
+        ~FFmpegBuf()
+        {
+            _max_size = 0;
+            free(_src_buf);
+        }
+};
+
 void DecodeMediaFile(const char *szInFilePath)
 {
+
+    av_log_set_level(0);
+
     int _device_id = 0;
     ck(cuInit(_device_id));
     CUcontext cuContext = NULL;
@@ -72,9 +136,6 @@ void DecodeMediaFile(const char *szInFilePath)
     checkCudaErrors(nvjpegEncoderParamsCreate(_nvjpeg_handle, &_encode_params, NULL));
     checkCudaErrors(nvjpegEncoderParamsSetQuality(_encode_params, 70, NULL));
     checkCudaErrors(nvjpegEncoderParamsSetOptimizedHuffman(_encode_params, 1, NULL));
-
-    FFmpegDemuxer demuxer(szInFilePath);
-    NvDecoder dec(cuContext, demuxer.GetWidth(), demuxer.GetHeight(), true, FFmpeg2NvCodecId(demuxer.GetVideoCodec()));
 
     nvjpegImage_t                _imgdesc;
     unsigned char *              _pBuffer;
@@ -105,12 +166,17 @@ void DecodeMediaFile(const char *szInFilePath)
     int nVideoBytes = 0, nFrameReturned = 0, nFrame = 0;
     uint8_t *pVideo = NULL, **ppFrame;
     bool bDecodeOutSemiPlanar = false;
-    double elapsed;
-    struct timespec start, finish;
+
+    uint8_t* buf = (uint8_t*)malloc(16793612);
+    readfile("test.hevc", buf, 16793612);
+    
+    FFmpegBuf mem_buf(buf, 16793612);//16793612是视频的大小
+    
+    FFmpegDemuxer buf_demuxer(&mem_buf);//从文件中test.hevc读取视频流，改为从内存中读(avio)
+    NvDecoder dec(cuContext, buf_demuxer.GetWidth(), buf_demuxer.GetHeight(), true, FFmpeg2NvCodecId(buf_demuxer.GetVideoCodec()));
     int count = 0;
-    clock_gettime(CLOCK_MONOTONIC, &start);
     do {
-        demuxer.Demux(&pVideo, &nVideoBytes);
+        buf_demuxer.Demux(&pVideo, &nVideoBytes);
         dec.Decode(pVideo, nVideoBytes, &ppFrame, &nFrameReturned);
         if (!nFrame && nFrameReturned)
             LOG(INFO) << dec.GetVideoInfo();
@@ -157,20 +223,13 @@ void DecodeMediaFile(const char *szInFilePath)
                 NULL));
       
             count = count + 1;
+            printf("count: %d\r\n",count);
             //std::string filename = "h265_yuv_" + std::to_string(count) + ".jpg";
             //std::ofstream outputFile(filename, std::ios::out | std::ios::binary);
             //outputFile.write(reinterpret_cast<const char *>(obuffer.data()), static_cast<int>(length));
         }
         nFrame += nFrameReturned;
     } while (nVideoBytes);
-
-    clock_gettime(CLOCK_MONOTONIC, &finish);
-
-    elapsed = (finish.tv_sec - start.tv_sec);
-    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
-
-    printf("elapsed time:%f\r\n",elapsed);
-
 }
 
 int main() 
