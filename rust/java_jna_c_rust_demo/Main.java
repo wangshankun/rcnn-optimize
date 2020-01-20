@@ -88,7 +88,6 @@ public class Main {
                     String[] img_ids;
                     img_ids = oneResult.image_ids.split(";"); // 分割字符串 
                     String pkg_name = img_ids[0] + "_" + img_ids[img_ids.length - 1] + ".bin";
-
                     //读出压缩好的内存，存成文件，image_ids，channel_id信息存到对应数据库中
                     byte[] pak_head_len_ay = new byte[8];
                     oneResult.compressed_buf.read(0, pak_head_len_ay, 0, 8);//前8字节存储包头长度
@@ -122,6 +121,7 @@ public class Main {
     public static void writeByteArrayToFile(String fileName, ByteBuffer data, Long len) 
     {
         int len_i = len.intValue();
+        System.out.println(len_i);
         byte[] data_byte = new byte[len_i];
         data.get(data_byte, 0, len_i);
         try
@@ -144,14 +144,14 @@ public class Main {
         INSTANCE.init(true,0,false,null,0);
 
         //压缩例子
-        //一次请求压缩9张图
-        int comp_num  = 9;
+        //一次请求压缩95张图,分到两个channel中
+        int comp_num  = 95;
         final CLibrary.CompressResultCallbackImplementation CompressCallbackImpl = new CLibrary.CompressResultCallbackImplementation();
         final CLibrary.CompressInputImage.ByReference arrays_ref = new CLibrary.CompressInputImage.ByReference();
         final CLibrary.CompressInputImage[] arrays = (CLibrary.CompressInputImage[])arrays_ref.toArray(comp_num);
         
         int ts_ms = 1234560;//假设时间戳开始日期
-        int count = 100;
+        int count = 1;
 
         for(CLibrary.CompressInputImage array : arrays )
         {
@@ -159,21 +159,19 @@ public class Main {
             byte[] img_buf = memory.getByteArray(0, 3*1024*1024);
             try
             {   
-                
-                String count_str = Integer.toString(count);
-                String file_name = count_str + ".jpg";
+                String count_str  = String.format("%04d",count);
+                String file_name = "./test_pic/" + count_str + ".jpg";
                 InputStream input = new FileInputStream(file_name);
                 int bytesRead = 0;
                 bytesRead = input.read(img_buf);
-                //System.out.println(bytesRead);
                 memory.write(0, img_buf, 0, bytesRead);
                 
                 array.image_id       = count_str;
-                if (count < 106)//前6张是一个channel
+                if (count < 46)//前面一半是一个channel
                 {
                     array.channel_id   = "hanzhou_1837_12111"; 
                 }
-                else//后三张是一个channel
+                else//后是另一个channel
                 {
                     array.channel_id   = "hanzhou_1137_12121"; 
                 }
@@ -192,19 +190,18 @@ public class Main {
         //调用压缩函数
         INSTANCE.compressListOfImage(arrays_ref, comp_num, CompressCallbackImpl);
 
-
         //解压例子
-        Memory dec_memory = new Memory(16*1024*1024 * Native.getNativeSize(byte.class));//一个压缩包图最大16M
-        byte[] dec_buf = dec_memory.getByteArray(0, 16*1024*1024);
+        Memory dec_memory = new Memory(32*1024*1024 * Native.getNativeSize(byte.class));//一个压缩包图最大32M
+        byte[] dec_buf = dec_memory.getByteArray(0, 32*1024*1024);
         
         final CLibrary.DecompressResultCallbackImplementation DecompressCallbackImpl = new CLibrary.DecompressResultCallbackImplementation();
         try
         {
-            InputStream dec_f = new FileInputStream("100_105.bin");
+            InputStream dec_f = new FileInputStream("0001_0045.bin");
             int bytes_read = dec_f.read(dec_buf);
             dec_memory.write(0, dec_buf, 0, bytes_read);
-            //从包里面取出101、104两张图片
-            INSTANCE.decompressListOfImage(dec_memory.share(0, bytes_read), bytes_read, "101;104", DecompressCallbackImpl);
+            //从包里面取出0011、0017两张图片
+            INSTANCE.decompressListOfImage(dec_memory.share(0, bytes_read), bytes_read, "0011;0017", DecompressCallbackImpl);
         }
         catch(IOException e)
         {
