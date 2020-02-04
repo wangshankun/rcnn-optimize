@@ -17,7 +17,9 @@
 
 #include "turbojpeg.h"
 
-#define MAX_JPG_BUF_SIZE  4 * 1024 * 1024
+#define MAX_JPG_BUF_SIZE    4  * 1024 * 1024
+#define MAX_VIDEO_BUF_SIZE  32 * 1024 * 1024
+
 
 #define savefile(name, buffer, size) do\
 {\
@@ -25,6 +27,16 @@
   if(out != NULL)\
   {\
         fwrite (buffer , sizeof(char), size, out);\
+        fclose (out);\
+  }\
+} while(0)
+
+#define readfile(name, buffer, size) do\
+{\
+  FILE *out = fopen(name, "rb");\
+  if(out != NULL)\
+  {\
+        fread (buffer , sizeof(char), size, out);\
         fclose (out);\
   }\
 } while(0)
@@ -61,7 +73,28 @@ int tyuv2jpeg(unsigned char* yuv_buffer, int yuv_size, int width, int height, in
     return ret;
 }
 
+struct buffer_data 
+{
+    uint8_t *ptr;
+    size_t size; ///< size left in the buffer
+};
 
+static int read_packet(void *opaque, uint8_t *buf, int buf_size)
+{
+    struct buffer_data *bd = (struct buffer_data *)opaque;
+    buf_size = FFMIN(buf_size, bd->size);
+
+    if (!buf_size)
+        return AVERROR_EOF;
+    //printf("ptr:%p size:%zu\n", bd->ptr, bd->size);
+
+    /* copy internal buffer data to buf */
+    memcpy(buf, bd->ptr, buf_size);
+    bd->ptr  += buf_size;
+    bd->size -= buf_size;
+
+    return buf_size;
+}
 int main()
 {
     //文件格式上下文
@@ -76,12 +109,36 @@ int main()
     int y_size;
     int ret, got_picture;
     struct SwsContext *img_convert_ctx;
-    char filepath[] = "test.hevc";
-    FILE *fp_yuv = fopen("output.yuv", "wb+");
+
     av_register_all();
     avformat_network_init();
     pFormatCtx = avformat_alloc_context();
-    if (avformat_open_input(&pFormatCtx, filepath, NULL, NULL) != 0) 
+    
+    //读取h265视频到内存中
+    unsigned char* video_buffer = ( unsigned char*)malloc(16793612);
+    readfile("test.hevc", video_buffer, 16793612);
+
+    struct buffer_data bd = { 0 };
+    bd.ptr                = video_buffer;
+    bd.size               = 16793612;
+
+    size_t avio_ctx_buffer_size = 40960;//申请avio
+    uint8_t* avio_ctx_buffer    = av_malloc(avio_ctx_buffer_size);
+    if (!avio_ctx_buffer) 
+    {
+        ret = AVERROR(ENOMEM);
+        return ret;
+    }
+    AVIOContext* avio_ctx = avio_alloc_context(avio_ctx_buffer, avio_ctx_buffer_size,
+                                               0, &bd, &read_packet, NULL, NULL);
+    if (!avio_ctx) 
+    {
+        ret = AVERROR(ENOMEM);
+        return ret;
+    }
+    pFormatCtx->pb = avio_ctx;
+
+    if (avformat_open_input(&pFormatCtx, NULL, NULL, NULL) != 0) 
     {
         printf("Couldn't open input stream.\n");
         return -1;
@@ -136,12 +193,7 @@ int main()
     out_buffer = (unsigned char *)av_malloc(yuv_buf_size);
     av_image_fill_arrays(pFrameYUV->data, pFrameYUV->linesize, out_buffer, AV_PIX_FMT_YUV420P, pCodecCtx->width, pCodecCtx->height, align);
     packet = (AVPacket *)av_malloc(sizeof(AVPacket));
-    //Output Info-----------------------------
-    printf("--------------- File Information ----------------\n");
-    //手工调试函数，输出tbn、tbc、tbr、PAR、DAR的含义
-    av_dump_format(pFormatCtx, 0, filepath, 0);
-    printf("-------------------------------------------------\n");
- 
+
     //申请转换上下文
     img_convert_ctx = sws_getContext(pCodecCtx->width, pCodecCtx->height, pCodecCtx->pix_fmt,
     pCodecCtx->width, pCodecCtx->height, AV_PIX_FMT_YUV420P, SWS_BICUBIC, NULL, NULL, NULL);
@@ -168,12 +220,7 @@ int main()
                 //成功解码一帧
                 sws_scale(img_convert_ctx, (const unsigned char* const*)pFrame->data, pFrame->linesize, 0, pCodecCtx->height,
                     pFrameYUV->data, pFrameYUV->linesize);//转换图像格式
- 
-                y_size = pCodecCtx->width*pCodecCtx->height;
-                fwrite(pFrameYUV->data[0], 1, y_size, fp_yuv);    //Y 
-                fwrite(pFrameYUV->data[1], 1, y_size / 4, fp_yuv);  //U
-                fwrite(pFrameYUV->data[2], 1, y_size / 4, fp_yuv);  //V
-                //printf("Succeed to decode 1 frame!\n");
+
                 tyuv2jpeg(pFrameYUV->data[0], yuv_buf_size, pCodecCtx->width, pCodecCtx->height, TJSAMP_420, &out_jpg, &jpg_size, 70);
                 count++;
                 sprintf(jpg_name, "h265_yuv_%d.jpg", count);
@@ -204,12 +251,7 @@ int main()
  
         sws_scale(img_convert_ctx, (const unsigned char* const*)pFrame->data, pFrame->linesize, 0, pCodecCtx->height,
             pFrameYUV->data, pFrameYUV->linesize);
- 
-        int y_size = pCodecCtx->width*pCodecCtx->height;
-        fwrite(pFrameYUV->data[0], 1, y_size, fp_yuv);    //Y 
-        fwrite(pFrameYUV->data[1], 1, y_size / 4, fp_yuv);  //U
-        fwrite(pFrameYUV->data[2], 1, y_size / 4, fp_yuv);  //V
-        //printf("Flush Decoder: Succeed to decode 1 frame!\n");
+
         tyuv2jpeg(pFrameYUV->data[0], yuv_buf_size, pCodecCtx->width, pCodecCtx->height, TJSAMP_420, &out_jpg, &jpg_size, 70);
         count++;
         sprintf(jpg_name, "h265_yuv_%d.jpg", count);
@@ -223,7 +265,6 @@ int main()
     av_frame_free(&pFrame);
     avcodec_close(pCodecCtx);
     avformat_close_input(&pFormatCtx);
-    fclose(fp_yuv);
- 
+
     return 0;
 }
