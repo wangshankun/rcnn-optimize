@@ -70,7 +70,8 @@ int compress_2_h265_cpu(unsigned char* in_datas, int* sizes, int in_num, unsigne
     //H.265
     if (codec->id == AV_CODEC_ID_H265 || codec->id == AV_CODEC_ID_HEVC){
         //av_dict_set(&param, "x265-params", "qp=20", 0);
-        av_dict_set(&param, "x265-params", "crf=28", 0);
+        av_dict_set(&param, "x265-params", "crf=32", 0);
+        av_dict_set(&param, "x265-params", "log-level=-1", 0);//log-level:default is 2(info)
         av_dict_set(&param, "preset", "fast", 0);
         //av_dict_set(&param, "tune", "zero-latency", 0);
     }
