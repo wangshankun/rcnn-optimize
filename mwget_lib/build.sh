@@ -12,5 +12,5 @@ rm -rf mwget.o
 
 g++ *.o  -o libmwget.so -shared  -lssl -lcrypto -lpthread
 
-g++ test.cpp -o test -lmwget -L./
+g++ test.cpp -o test -lmwget -L./ -Wl,-rpath,./
 
