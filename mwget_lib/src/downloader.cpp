@@ -482,12 +482,12 @@ Downloader::file_download(void)
 		cout<<_("File already exist: ")<<localPath<<endl;
 		return 0;
 	}
-	cout<<_("Begin to download: ")
-		<<(task.get_local_file() ? task.get_local_file() : task.url.get_file())<<endl;
+	//cout<<_("Begin to download: ")
+	//	<<(task.get_local_file() ? task.get_local_file() : task.url.get_file())<<endl;
 	char buf[6];
 	double time = get_current_time();
 	convert_size(buf, task.fileSize);
-	cout<<_("FileSize: ")<<buf<<endl;
+	//cout<<_("FileSize: ")<<buf<<endl;
 
 	if(task.fileSize == 0){
 		int fd;
@@ -535,7 +535,7 @@ Downloader::file_download(void)
 	pb->set_block_num(threadNum);
 	pb->set_start_point(data);
 
-	// update loop
+	// update loop 
 	global_downloading = true;
 	while(1){
 		if(global_sigint_received){
@@ -546,7 +546,7 @@ Downloader::file_download(void)
 		for(i = 0; i < threadNum; i ++){
 			data[i] = blocks[i].downloaded;
 		}
-		pb->update(data);
+		//pb->update(data);//取消进度条的显示
 
 		if(schedule() == 0){
 			break; // all the thread are exit
@@ -580,7 +580,7 @@ Downloader::file_download(void)
 
 	time = get_current_time() - time;
 	convert_time(buf, time);
-	cout<<_("Download successfully in ")<<buf<<_(" M:S")<<endl;
+	//cout<<_("Download successfully in ")<<buf<<_(" M:S")<<endl;
 
 	return 0;
 }; // end of file_download
