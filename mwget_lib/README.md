@@ -15,10 +15,13 @@ make install
 
 或者不安装，直接执行 ./src/mwget
 
-增加了warp封装成库集成代码中，把进度条显示，文件大小等显示log全部注释掉了，不报错就执行正常
+###增加了warp封装成库集成代码中，把进度条显示，文件大小等显示log全部注释掉了，不报错就执行正常
 
 chmod a+x build.sh
 
 ./build.sh
 
 ./src/test
+
+
+![image](https://github.com/wangshankun/rcnn-optimize/blob/master/mwget_lib/readme.jpg)
