@@ -1,0 +1,65 @@
+name: "VGG"
+input: "data"
+input_shape {
+  dim: 175
+  dim: 1
+  dim: 384
+}
+input: "cont"
+input_shape {
+  dim: 175
+  dim: 1
+}
+
+layer {
+  name: "lstm1"
+  type: "LSTM"
+  bottom: "data"
+  bottom: "cont"
+  top: "lstm1"
+  recurrent_param {
+      num_output: 192
+  }
+}
+
+layer {
+  name: "lstm-reverse1"
+  type: "Reverse"
+  bottom: "data"
+  top: "reverse_data"
+  reverse_param {
+    axis: 0
+  }
+}
+
+layer {
+  name: "lstm2"
+  type: "LSTM"
+  bottom: "reverse_data"
+  bottom: "cont"
+  top: "lstm2"
+  recurrent_param {
+      num_output: 192
+  }
+}
+
+layer {
+  name: "lstm2_reverse"
+  type: "Reverse"
+  bottom: "lstm2"
+  top: "lstm2_reverse"
+  reverse_param {
+    axis: 0
+  }
+}
+
+layer {
+  name: "merge_lstm_rlstm"
+  type: "Concat"
+  bottom: "lstm1"
+  bottom: "lstm2_reverse"
+  top: "merge_lstm_rlstm"
+  concat_param {
+    axis: 2
+  }
+}
