@@ -10,6 +10,9 @@
 ### 也就是说cudnn blstm有八个weight，而caffe需要六个，转成caffe时候
 ### 把Bih + Bhh的结果放到B里面就好了；
 
+### caffe还有个额外输入cont,这个全设置1，和seqlen一样长度；参考文章Caffe LSTM 实现mnist识别详细解释
+### https://blog.csdn.net/u011808673/article/details/81054729
+
 ## 上述转换内容在脚本例子中可以看到
 
 * 使用到的reverse 来自CTPN； 包括用两个lstm拼接成一个BLSTM的结构都来自于CTPN
