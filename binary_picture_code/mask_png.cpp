@@ -171,6 +171,7 @@ int main()
     vector<string> files = vector<string>();
     get_dir_list(dir, files);
 
+    clock_gettime(CLOCK_MONOTONIC, &start);
     vector<cv::Mat> test_png;
     for (auto &d: files) 
     {
@@ -178,7 +179,21 @@ int main()
         cv::Mat test_img = cv::imread(full_file_name, CV_LOAD_IMAGE_GRAYSCALE);
         test_png.push_back(test_img);
     }
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+    printf("test_png read elapsed time:%f\r\n",elapsed);
     
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    for (auto &d: test_png)
+    {
+        cv::imwrite("tmp.png",d);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+    printf("test_png write elapsed time:%f\r\n",elapsed);
+
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     std::vector<Bin_pic_t> ser_bin_pics;
