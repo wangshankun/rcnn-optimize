@@ -15,6 +15,9 @@
 
 // include this header to serialize vectors
 #include <boost/serialization/vector.hpp>
+#include <boost/iostreams/filter/stdio.hpp>
+#include <boost/iostreams/device/back_inserter.hpp>
+#include <boost/iostreams/stream.hpp>
 
 using namespace std;
 
@@ -76,7 +79,7 @@ int main()
     vector<string> files = vector<string>();
     get_dir_list(dir, files);
 
-    std::vector<std::vector<uint8_t>> jpgs;
+    std::vector<std::vector<uint8_t>> ser_jpgs;
     for (auto &d: files) 
     {
         string full_file_name = dir + d;
@@ -85,17 +88,25 @@ int main()
         uint8_t* tmp = (uint8_t*)malloc(file_size);
         readfile(full_file_name.c_str(), tmp,  file_size);
         std::vector<uint8_t> jpg_file(&tmp[0], &tmp[file_size]);
-        jpgs.push_back(jpg_file);
+        ser_jpgs.push_back(jpg_file);
         //printf("%s file_size:%d\r\n",full_file_name.c_str(), file_size);
     }
 
     double elapsed;
     struct timespec start, finish;
     clock_gettime(CLOCK_MONOTONIC, &start);
+    
+    std::string serial_str;
+    boost::iostreams::back_insert_device<std::string> inserter(serial_str);
+    boost::iostreams::stream<boost::iostreams::back_insert_device<std::string> > oss(inserter);
+    boost::archive::binary_oarchive oa(oss);
+    oa << ser_jpgs;
+    oss.flush();
+    printf("serial_str.size:%d \r\n",serial_str.size());
     //序列化
-    std::ofstream ofs("/tmp/copy.ser");
-    boost::archive::binary_oarchive oa(ofs);
-    oa & jpgs;
+    //std::ofstream ofs("/tmp/copy.ser");
+    //boost::archive::binary_oarchive oa(ofs);
+    //oa & ser_jpgs;
 
     clock_gettime(CLOCK_MONOTONIC, &finish);
     elapsed = (finish.tv_sec - start.tv_sec);
@@ -103,19 +114,24 @@ int main()
     printf("elapsed time:%f\r\n",elapsed);
     
     clock_gettime(CLOCK_MONOTONIC, &start);
-     //序列化
-    std::vector<std::vector<uint8_t>> rjpgs;
-    std::ifstream ifs("/tmp/copy.ser");
-    boost::archive::binary_iarchive ia(ifs);
-    ia & rjpgs;
-    
+     //反序列化
+    std::vector<std::vector<uint8_t>> rser_jpgs;
+    //std::ifstream ifs("/tmp/copy.ser");
+    //boost::archive::binary_iarchive ia(ifs);
+    //ia & rser_jpgs;
+
+    boost::iostreams::basic_array_source<char> device(serial_str.data(), serial_str.size());
+    boost::iostreams::stream<boost::iostreams::basic_array_source<char> > iss(device);
+    boost::archive::binary_iarchive ia(iss);
+    ia >> rser_jpgs;
+
     clock_gettime(CLOCK_MONOTONIC, &finish);
     elapsed = (finish.tv_sec - start.tv_sec);
     elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
     printf("elapsed time:%f\r\n",elapsed);
     
    //resave last pic to check
-   for (auto &d: rjpgs) 
+   for (auto &d: rser_jpgs) 
    {
       savefile("vect_b.jpg", &d[0], d.size());
    }
