@@ -18,6 +18,7 @@
 #include <boost/iostreams/filter/stdio.hpp>
 #include <boost/iostreams/device/back_inserter.hpp>
 #include <boost/iostreams/stream.hpp>
+#include <boost/interprocess/streams/bufferstream.hpp>
 
 using namespace std;
 
@@ -96,13 +97,21 @@ int main()
     struct timespec start, finish;
     clock_gettime(CLOCK_MONOTONIC, &start);
     
-    std::string serial_str;
-    boost::iostreams::back_insert_device<std::string> inserter(serial_str);
-    boost::iostreams::stream<boost::iostreams::back_insert_device<std::string> > oss(inserter);
-    boost::archive::binary_oarchive oa(oss);
+    #define tmp_buf_len (1024*1024*3L)
+    char* tmp = (char*)malloc(tmp_buf_len);
+    // write the serializable structure
+    boost::interprocess::obufferstream obs(static_cast<char*>(tmp), tmp_buf_len);
+    boost::archive::binary_oarchive oa(dynamic_cast<ostream&>(obs));
     oa << ser_jpgs;
-    oss.flush();
-    printf("serial_str.size:%d \r\n",serial_str.size());
+
+    //std::string serial_str;
+    //boost::iostreams::back_insert_device<std::string> inserter(serial_str);
+    //boost::iostreams::stream<boost::iostreams::back_insert_device<std::string> > oss(inserter);
+    //boost::archive::binary_oarchive oa(oss);
+    //oa << ser_jpgs;
+    //oss.flush();
+    //printf("serial_str.size:%d \r\n",serial_str.size());
+    
     //序列化
     //std::ofstream ofs("/tmp/copy.ser");
     //boost::archive::binary_oarchive oa(ofs);
@@ -120,9 +129,13 @@ int main()
     //boost::archive::binary_iarchive ia(ifs);
     //ia & rser_jpgs;
 
-    boost::iostreams::basic_array_source<char> device(serial_str.data(), serial_str.size());
-    boost::iostreams::stream<boost::iostreams::basic_array_source<char> > iss(device);
-    boost::archive::binary_iarchive ia(iss);
+    //boost::iostreams::basic_array_source<char> device(serial_str.data(), serial_str.size());
+    //boost::iostreams::stream<boost::iostreams::basic_array_source<char> > iss(device);
+    //boost::archive::binary_iarchive ia(iss);
+    //ia >> rser_jpgs;
+
+    boost::interprocess::ibufferstream ibs(static_cast<char*>(tmp), tmp_buf_len);
+    boost::archive::binary_iarchive ia(dynamic_cast<istream&>(ibs));
     ia >> rser_jpgs;
 
     clock_gettime(CLOCK_MONOTONIC, &finish);
