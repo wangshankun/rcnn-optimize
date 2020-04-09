@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include <fstream>
 #include <sys/types.h>
 #include <dirent.h>
@@ -19,6 +20,10 @@
 #include <boost/iostreams/device/back_inserter.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <boost/interprocess/streams/bufferstream.hpp>
+
+#include <boost/archive/iterators/base64_from_binary.hpp>
+#include <boost/archive/iterators/binary_from_base64.hpp>
+#include <boost/archive/iterators/transform_width.hpp>
 
 using namespace std;
 
@@ -42,6 +47,31 @@ using namespace std;
   }\
 } while(0)
 
+
+
+bool Base64Encode(const string& input, string* output) {
+  typedef boost::archive::iterators::base64_from_binary<boost::archive::iterators::transform_width<string::const_iterator, 6, 8> > Base64EncodeIterator;
+  stringstream result;
+  copy(Base64EncodeIterator(input.begin()) , Base64EncodeIterator(input.end()), ostream_iterator<char>(result));
+  size_t equal_count = (3 - input.length() % 3) % 3;
+  for (size_t i = 0; i < equal_count; i++) {
+    result.put('=');
+  }
+  *output = result.str();
+  return output->empty() == false;
+}
+ 
+bool Base64Decode(const string& input, string* output) {
+  typedef boost::archive::iterators::transform_width<boost::archive::iterators::binary_from_base64<string::const_iterator>, 8, 6> Base64DecodeIterator;
+  stringstream result;
+  try {
+    copy(Base64DecodeIterator(input.begin()) , Base64DecodeIterator(input.end()), ostream_iterator<char>(result));
+  } catch(...) {
+    return false;
+  }
+  *output = result.str();
+  return output->empty() == false;
+}
 
 int get_dir_list(string dir, vector<string> &files)
 {
@@ -97,12 +127,19 @@ int main()
     struct timespec start, finish;
     clock_gettime(CLOCK_MONOTONIC, &start);
     
-    #define tmp_buf_len (1024*1024*3L)
-    char* tmp = (char*)malloc(tmp_buf_len);
-    // write the serializable structure
-    boost::interprocess::obufferstream obs(static_cast<char*>(tmp), tmp_buf_len);
-    boost::archive::binary_oarchive oa(dynamic_cast<ostream&>(obs));
+    
+    std::stringstream ss;
+    boost::archive::binary_oarchive oa(ss);
     oa << ser_jpgs;
+    //printf("ss.size:%d \r\n", ss.str().size());
+
+
+    //#define tmp_buf_len (1024*1024*3L)
+    //char* tmp = (char*)malloc(tmp_buf_len);
+    //// write the serializable structure
+    //boost::interprocess::obufferstream obs(static_cast<char*>(tmp), tmp_buf_len);
+    //boost::archive::binary_oarchive oa(dynamic_cast<ostream&>(obs));
+    //oa << ser_jpgs;
 
     //std::string serial_str;
     //boost::iostreams::back_insert_device<std::string> inserter(serial_str);
@@ -117,10 +154,23 @@ int main()
     //boost::archive::binary_oarchive oa(ofs);
     //oa & ser_jpgs;
 
+    
     clock_gettime(CLOCK_MONOTONIC, &finish);
     elapsed = (finish.tv_sec - start.tv_sec);
     elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
-    printf("elapsed time:%f\r\n",elapsed);
+    printf("ser elapsed time:%f\r\n",elapsed);
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    std::string base64_str, output_str;
+    Base64Encode(ss.str(), &base64_str);
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+    printf("Base64Encode elapsed time:%f\r\n",elapsed);
+    
+
+    Base64Decode(base64_str, &output_str);
+    
     
     clock_gettime(CLOCK_MONOTONIC, &start);
      //反序列化
@@ -134,14 +184,20 @@ int main()
     //boost::archive::binary_iarchive ia(iss);
     //ia >> rser_jpgs;
 
-    boost::interprocess::ibufferstream ibs(static_cast<char*>(tmp), tmp_buf_len);
-    boost::archive::binary_iarchive ia(dynamic_cast<istream&>(ibs));
-    ia >> rser_jpgs;
+    //boost::interprocess::ibufferstream ibs(static_cast<char*>(tmp), tmp_buf_len);
+    //boost::archive::binary_iarchive ia(dynamic_cast<istream&>(ibs));
+    //ia >> rser_jpgs;
 
+    std::stringstream iss;
+    iss << output_str;
+    boost::archive::binary_iarchive ia(iss);
+    ia >> rser_jpgs;
+    printf("ss.size:%d %s \r\n", iss.str().size(), iss.str().c_str());
+    
     clock_gettime(CLOCK_MONOTONIC, &finish);
     elapsed = (finish.tv_sec - start.tv_sec);
     elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
-    printf("elapsed time:%f\r\n",elapsed);
+    printf("rser elapsed time:%f\r\n",elapsed);
     
    //resave last pic to check
    for (auto &d: rser_jpgs) 
