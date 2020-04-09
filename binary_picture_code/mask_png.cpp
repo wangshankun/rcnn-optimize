@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include <fstream>
 #include <sys/types.h>
 #include <dirent.h>
@@ -12,6 +13,10 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/opencv.hpp"
+
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/serialization/vector.hpp>
 
 using namespace std;
 
@@ -46,17 +51,37 @@ int get_file_size(const char* file_name)
     return statbuf.st_size;
 }
 
-typedef struct {
-    uint16_t s_idx;
-    uint16_t e_idx;
+typedef class CPos{
+    private:
+        friend class boost::serialization::access;
+        template <typename Archive>
+        void serialize(Archive &ar, const unsigned int version)
+        {
+            ar & s_idx;
+            ar & e_idx;
+        }
+    public:
+        uint16_t s_idx;
+        uint16_t e_idx;
 } Pos_t;
 
 typedef std::vector<Pos_t> Pos_vec;
 
-typedef struct {
-    uint16_t rows;
-    uint16_t cols;
-    std::vector<Pos_vec> rows_record;
+typedef class CBin_pic {
+    private:
+        friend class boost::serialization::access;
+        template <typename Archive>
+        void serialize(Archive &ar, const unsigned int version)
+        {
+            ar & rows;
+            ar & cols;
+            ar & rows_record;
+        }
+        
+    public:
+        uint16_t rows;
+        uint16_t cols;
+        std::vector<Pos_vec> rows_record;
 } Bin_pic_t;
 
 static void binary_picture_encode(cv::Mat bgr_mat,  Bin_pic_t* en_pic)
@@ -209,14 +234,36 @@ int main()
     elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
     printf("binary_picture_encode elapsed time:%f\r\n",elapsed);
 
+    printf("%d %d\r\n",sizeof(Bin_pic_t) , ser_bin_pics.size());
+
+    //序列化
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    std::stringstream ss;
+    boost::archive::binary_oarchive oa(ss);
+    oa << ser_bin_pics;
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+    printf("ser_encode elapsed time:%f\r\n",elapsed);
+    printf("ss.size:%d  \r\n", ss.str().size());
+    //反序列化
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    std::vector<Bin_pic_t> rser_bin_pics;
+    boost::archive::binary_iarchive ia(ss);
+    ia >> rser_bin_pics;
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+    printf("rser_encode elapsed time:%f\r\n",elapsed);
+    
     //测试一下
     cv::Mat bgr_mat;
-    binary_picture_decode(bgr_mat, ser_bin_pics[0]);
+    binary_picture_decode(bgr_mat, rser_bin_pics[0]);
     cv::imwrite("./x.bmp",bgr_mat);
     
     clock_gettime(CLOCK_MONOTONIC, &start);
     //解码
-    for (auto &bin_pic: ser_bin_pics) 
+    for (auto &bin_pic: rser_bin_pics) 
     {
         cv::Mat bgr_mat;
         binary_picture_decode(bgr_mat, bin_pic);

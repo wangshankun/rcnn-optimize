@@ -3,3 +3,5 @@
 * test\_png write elapsed time:0.109901
 * binary\_picture\_encode elapsed time:0.012160
 * binary\_picture\_decode elapsed time:0.003772
+
+* 自定义格式序列化例子 https://www.jianshu.com/p/e564c13795d5
