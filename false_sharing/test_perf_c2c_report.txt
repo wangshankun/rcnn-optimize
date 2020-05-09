@@ -1,0 +1,112 @@
+[shankun@hci-hz2 /home/shankun/test/false_sharing]$sudo perf c2c record -F 40000 -a --all-user ./test
+[sudo] password for shankun:
+result: 800000000
+avg elapsed time:0.043115
+[ perf record: Woken up 3 times to write data ]
+[ perf record: Captured and wrote 24.833 MB perf.data (212008 samples) ]
+[shankun@hci-hz2 /home/shankun/test/false_sharing]$perf c2c report --stdio
+failed to open perf.data: Permission denied
+[shankun@hci-hz2 /home/shankun/test/false_sharing]$sudo perf c2c report --stdio
+=================================================
+            Trace Event Information
+=================================================
+  Total records                     :     212008
+  Locked Load/Store Operations      :        722
+  Load Operations                   :      15158
+  Loads - uncacheable               :          0
+  Loads - IO                        :          0
+  Loads - Miss                      :          0
+  Loads - no mapping                :         25
+  Load Fill Buffer Hit              :       5291
+  Load L1D hit                      :       3344
+  Load L2D hit                      :       1418
+  Load LLC hit                      :       1413
+  Load Local HITM                   :         22
+  Load Remote HITM                  :          0
+  Load Remote HIT                   :          0
+  Load Local DRAM                   :       3667
+  Load Remote DRAM                  :          0
+  Load MESI State Exclusive         :          0
+  Load MESI State Shared            :       3667
+  Load LLC Misses                   :       3667
+  LLC Misses to Local DRAM          :      100.0%
+  LLC Misses to Remote DRAM         :        0.0%
+  LLC Misses to Remote cache (HIT)  :        0.0%
+  LLC Misses to Remote cache (HITM) :        0.0%
+  Store Operations                  :     196850
+  Store - uncacheable               :          0
+  Store - no mapping                :          0
+  Store L1D Hit                     :     196311
+  Store L1D Miss                    :        539
+  No Page Map Rejects               :       9024
+  Unable to parse data source       :          0
+
+=================================================
+    Global Shared Cache Line Event Information
+=================================================
+  Total Shared Cache Lines          :          5
+  Load HITs on shared lines         :         22
+  Fill Buffer Hits on shared lines  :          0
+  L1D hits on shared lines          :          0
+  L2D hits on shared lines          :          0
+  LLC hits on shared lines          :         22
+  Locked Access on shared lines     :          0
+  Store HITs on shared lines        :        122
+  Store L1D hits on shared lines    :         37
+  Total Merged records              :        144
+
+=================================================
+                 c2c details
+=================================================
+  Events                            : cpu/mem-loads,ldlat=30/P
+                                    : cpu/mem-stores/P
+  Cachelines sort on                : Total HITMs
+  Cacheline data grouping           : offset,pid,iaddr
+
+=================================================
+           Shared Data Cache Line Table
+=================================================
+#
+#        ----------- Cacheline ----------    Total      Tot  ----- LLC Load Hitm -----  ---- Store Reference ----  --- Load Dr
+# Index             Address  Node  PA cnt  records     Hitm    Total      Lcl      Rmt    Total    L1Hit   L1Miss       Lcl
+# .....  ..................  ....  ......  .......  .......  .......  .......  .......  .......  .......  .......  ........  .
+#
+      0      0x7fa0f236d400     0     133      140   81.82%       18       18        0      122       37       85         0
+      1            0xeeeec0     0       1        1    4.55%        1        1        0        0        0        0         0
+      2            0xefad00     0       1        1    4.55%        1        1        0        0        0        0         0
+      3           0x1574880     0       1        1    4.55%        1        1        0        0        0        0         0
+      4            0x79fc80     0       1        1    4.55%        1        1        0        0        0        0         0
+
+=================================================
+      Shared Cache Line Distribution Pareto
+=================================================
+#
+#        ----- HITM -----  -- Store Refs --  --------- Data address ---------                               ---------- cycles
+#   Num      Rmt      Lcl   L1 Hit  L1 Miss              Offset  Node  PA cnt      Pid        Code address  rmt hitm  lcl hitm
+# .....  .......  .......  .......  .......  ..................  ....  ......  .......  ..................  ........  ........
+#
+  -------------------------------------------------------------
+      0        0       18       37       85      0x7fa0f236d400
+  -------------------------------------------------------------
+           0.00%  100.00%    0.00%    0.00%                 0x0     0      16   189036            0x4c4a49         0       196
+           0.00%    0.00%  100.00%  100.00%                 0x8     0     116   189036            0x4c4b35         0         0
+
+  -------------------------------------------------------------
+      1        0        1        0        0            0xeeeec0
+  -------------------------------------------------------------
+           0.00%  100.00%    0.00%    0.00%                0x10     0       1   189080            0x7e21cf         0       168
+
+  -------------------------------------------------------------
+      2        0        1        0        0            0xefad00
+  -------------------------------------------------------------
+           0.00%  100.00%    0.00%    0.00%                0x18     0       1   188945            0x816868         0       216
+
+  -------------------------------------------------------------
+      3        0        1        0        0           0x1574880
+  -------------------------------------------------------------
+           0.00%  100.00%    0.00%    0.00%                 0x0     0       1   187882            0x7931e0         0       177
+
+  -------------------------------------------------------------
+      4        0        1        0        0            0x79fc80
+  -------------------------------------------------------------
+           0.00%  100.00%    0.00%    0.00%                 0x6     0       1   188789      0x7f0b46ab4641         0       233

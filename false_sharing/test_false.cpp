@@ -98,6 +98,6 @@ class Counters
 
 int main()
 {
-    Counters test_sk_cacheline8(8, 32);
-    test_sk_cacheline8.Test();
+    Counters test8(8, 1);
+    test8.Test();
 }
