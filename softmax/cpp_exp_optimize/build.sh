@@ -8,7 +8,9 @@ g++ softmax.cpp -std=c++11 -O3 -fopenmp -o softmax
 # -fstrict-aliasing -ffunction-sections -fdata-sections -ffast-math -fno-rtti -fno-exceptions   \
 # -fPIC -std=gnu++11 sf.cpp -o sf
 
-c++  -std=c++11 -O3 -fopenmp -fPIC -std=gnu++11 sf.cpp -o sf
+#c++  -std=c++11 -O3 -fopenmp -fPIC -std=gnu++11 sf.cpp -o sf
+
+c++  -std=c++11 -O3 -fopenmp -fPIC -std=gnu++11 sf.cpp MNNExpC8.S  -o sf
 
 python test.py
 

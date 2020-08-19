@@ -39,6 +39,8 @@ _Pragma("omp parallel for") for (int __iter__ = 0; __iter__ < __num__; __iter__+
 #define ALIMAX(x, y) ((x) > (y) ? (x) : (y))
 #define UP_DIV(x, y) (((x) + (y) - (1)) / (y))
 
+extern "C" void MNNExpC8(float* dest, const float* source, const float* parameters, size_t countC8);
+/*
 void MNNExpC8(float* dest, const float* source, const float* parameters, size_t countC8) {
     auto count = countC8 * 8;
     auto param = parameters[0];
@@ -58,7 +60,7 @@ void MNNExpC8(float* dest, const float* source, const float* parameters, size_t 
         dest[i] = expBasic * expRemain;
     }
 }
-
+*/
 void MNNExp(float* dst, const float* src, size_t dataSize) {
     int countC8        = (int)dataSize / 8;
     if (countC8 > 0) {
@@ -149,7 +151,6 @@ int softmax(const float *srcData, float *dstData, int outside, int channel, int 
         for (int y = (int)tId; y < outside; y += threadNum, dstY += channel * threadNum) {
             // sum
             float sumValue = 0;
-
             for (int c = 0; c < channel; ++c) {
                 sumValue += dstY[c];
             }
@@ -169,17 +170,9 @@ int softmax(const float *srcData, float *dstData, int outside, int channel, int 
 }
 
 
-
-
 int main()
 {
-  int threadNum = 1;
-/*
-  int outside   = 75;
-  int channel   = 7367;
-  float* data = (float*)malloc(outside * channel * sizeof(float));
-  readfile("caffe_ip1_out.bin", data, outside * channel * sizeof(float));
-*/
+  int threadNum = 4;
   int outside   = 1024*1024;
   int channel   = 3;
   float* data = (float*)malloc(outside * channel * sizeof(float));
