@@ -59,6 +59,7 @@ void *PrintHello(void *threadid)
     std::cout << "Hi, 我是线程 ID:[" << tid << "]" << std::endl;
 
     // 打印实例地址
+    Single::GetInstance();
     Single::GetInstance().Print();
 
     pthread_exit(NULL);
@@ -71,6 +72,7 @@ int main(void)
     pthread_t threads[NUM_THREADS] = {0};
     int indexes[NUM_THREADS] = {0}; // 用数组来保存i的值
 
+    Single::GetInstance();
     int ret = 0;
     int i = 0;
 
