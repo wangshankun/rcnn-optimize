@@ -1,67 +1,7 @@
-#include <string.h>
-#include <iostream>
-#include <vector>
-#include <iostream>
-#include <algorithm>
-
-#include<cmath>
-#include <arm_neon.h> 
-#include "omp.h"
-
-
-#define savefile(name, buffer, size) do\
-{\
-  FILE *out = fopen(name, "wb");\
-  if(out != NULL)\
-  {\
-        fwrite (buffer , sizeof(char), size, out);\
-        fclose (out);\
-  }\
-} while(0)
-
-#define readfile(name, buffer, elem_size) do\
-{\
-  FILE *out = fopen(name, "rb");\
-  if(out != NULL)\
-  {\
-        fread (buffer , sizeof(buffer[0]), elem_size, out);\
-        fclose (out);\
-  }\
-} while(0)
-    
-
-#define MNN_CONCURRENCY_BEGIN(__iter__, __num__) \
-_Pragma("omp parallel for") for (int __iter__ = 0; __iter__ < __num__; __iter__++) {
-#define MNN_CONCURRENCY_END() }
-
-
-#define ALIMIN(x, y) ((x) < (y) ? (x) : (y))
-#define ALIMAX(x, y) ((x) > (y) ? (x) : (y))
-#define UP_DIV(x, y) (((x) + (y) - (1)) / (y))
-
+#include "ops.h"
 extern "C" void MNNExpC8(float* dest, const float* source, const float* parameters, size_t countC8);
-/*
-void MNNExpC8(float* dest, const float* source, const float* parameters, size_t countC8) {
-    auto count = countC8 * 8;
-    auto param = parameters[0];
-    float xLimit = 87;
-    for (int i = 0; i < count; ++i) {
-        auto x         = -source[i];
-        x = ALIMAX(x, -xLimit);
-        x = ALIMIN(x, xLimit);
-        int div        = (x * parameters[1]);
-        int div2       = (div + 127) << 23;
-        auto xReamin   = x - div * param;
-        float expBasic = *(float*)(&div2);
-        auto t = xReamin;
-        auto expRemain =
-            ((((parameters[7] * t + parameters[6]) * t + parameters[5]) * t + parameters[4]) * t + parameters[3]) * t +
-            parameters[2];
-        dest[i] = expBasic * expRemain;
-    }
-}
-*/
-void MNNExp(float* dst, const float* src, size_t dataSize) {
+
+static void MNNExp(float* dst, const float* src, size_t dataSize) {
     int countC8        = (int)dataSize / 8;
     if (countC8 > 0) {
         // Align to eight so asm is easier to write
@@ -73,10 +13,6 @@ void MNNExp(float* dst, const float* src, size_t dataSize) {
     auto param = log(2.0f);
     float xLimit = 87;
     for (int i = remain; i < dataSize; i++) {
-        /*Origin Function*/
-        //dst[i] = expf(-src[i]);
-        /*Approciate Function*/
-        
         auto x         = -src[i];
         x = ALIMAX(x, -xLimit);
         x = ALIMIN(x, xLimit);
@@ -92,7 +28,7 @@ void MNNExp(float* dst, const float* src, size_t dataSize) {
     }
 }
 
-std::pair<int, int> multiThreadDivide(int size, int threadNum)
+static std::pair<int, int> multiThreadDivide(int size, int threadNum)
 {
     int sizeDivide = size / threadNum;
     sizeDivide = UP_DIV(sizeDivide, 4) * 4;
@@ -103,7 +39,8 @@ std::pair<int, int> multiThreadDivide(int size, int threadNum)
     return std::make_pair(sizeDivide, scheduleNumber);
 }
 
-int softmax(const float *srcData, float *dstData, int outside, int channel, int threadNum) {
+void softmax(const float *srcData, float *dstData, int outside, int channel, int threadNum) 
+{
     // Max and sub
     MNN_CONCURRENCY_BEGIN(tId, threadNum)
     {
@@ -165,31 +102,48 @@ int softmax(const float *srcData, float *dstData, int outside, int channel, int 
         }
     }
     MNN_CONCURRENCY_END();
-
-    return 0;
 }
 
 
-int main()
+static bool PairCompare(const std::pair<float, float>& lhs,
+                        const std::pair<float, float>& rhs) {
+  return lhs.second > rhs.second;
+}
+
+static void _Argmax(const float* data, int v_len, int n, float* out) 
 {
-  int threadNum = 4;
-  int outside   = 1024*1024;
-  int channel   = 3;
-  float* data = (float*)malloc(outside * channel * sizeof(float));
-  readfile("softmax.bin", data, outside * channel * sizeof(float));
+  std::vector<float> v;
+  v.assign(data, data + v_len);
 
-  float* out = (float*)malloc(outside * channel * sizeof(float));
+  std::vector<std::pair<float, float> > pairs;
+  for (size_t i = 0; i < v.size(); ++i)
+  {
+    pairs.push_back(std::make_pair(float(i), v[i]));
+  }
 
-    double elapsed;
-    struct timespec start, finish;
-    clock_gettime(CLOCK_MONOTONIC, &start);
+  std::partial_sort(pairs.begin(), pairs.begin() + n, pairs.end(), PairCompare);
 
-    softmax(data, out, outside, channel, threadNum);
-    
-    clock_gettime(CLOCK_MONOTONIC, &finish);
-    elapsed = (finish.tv_sec - start.tv_sec);
-    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+  for (size_t k = 0; k < n; k++)
+  {
+    out[k] = pairs[k].first; 
+  }
 
-    printf("elapsed time:%f out[x]:%f\r\n",elapsed, out[888888]);
-    return 0;
+  for (size_t k = 0; k < n; k++)
+  {
+    out[n + k] = pairs[k].second; 
+  }
+}
+
+
+void argmax(const float *srcData, float *dstData, int outside, int channel, int n, int threadNum)
+{
+    int k;
+    omp_set_num_threads(threadNum);
+    #pragma omp parallel for private(k)
+    for(k = 0; k < outside; k++)
+    {
+        const float *srcY = k * channel + srcData;
+        float *dstY       = k * 2 * n   + dstData;
+        _Argmax(srcY, channel, n, dstY);
+    }
 }
