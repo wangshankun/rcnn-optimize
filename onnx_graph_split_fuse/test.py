@@ -38,9 +38,9 @@ def main(argv):
                        help="""Input tensors info: "input_name;elem_type;dim0;dim1;dim2;dim3" 
                                \r\n Example: "in0;1;1;224;2224;3" "in1;1;1;32;32;128" """)
     parser.add_argument("--hd_type", required=True, help="Target device hardware type.")
-    parser.add_argument('--max_sub_num', default=3,
+    parser.add_argument('--max_sub_num', default=128,
                         help='The max number of npu subgraph')
-    parser.add_argument('--min_node_num', default=10,
+    parser.add_argument('--min_node_num', default=6,
                         help='The min number of each npu subgraph nodes')
 
     args = parser.parse_args(argv)
@@ -86,7 +86,7 @@ def main(argv):
         hd_op_type.add(line)
     #print(hd_op_type)
 
-    sf = Transgraph(inferred_model, hd_op_type)
+    sf = Transgraph(inferred_model, hd_op_type, args.max_sub_num, args.min_node_num)
     sf.exe()
 
 if __name__ == "__main__":

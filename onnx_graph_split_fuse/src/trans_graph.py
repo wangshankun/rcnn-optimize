@@ -38,7 +38,6 @@ class Subgraph(object):
         self.all_nodes = list(nx.topological_sort(self.sub_digraph))
         self.mid_nodes =list(set(self.all_nodes) - set(self.root_nodes) - set(self.leaf_nodes))
 
-
 class Transgraph(object):
     def __init__(self, model, hd_op_type, max_sub_num = 3, min_node_num = 10):
         self.model = model
@@ -60,25 +59,6 @@ class Transgraph(object):
         self.input_nodes_is_cpu_set  = set()
         self.output_nodes_is_cpu_set = set()
 
-    def _get_sub_io_node_info(self, sub_t):
-        #获取子图输入node
-        all_inputs = set()
-        init_input = []
-        for n_name in sub_t.root_nodes:
-            for i in self.node_dict[n_name].input:
-                if i not in self.init_dict.keys():
-                    all_inputs.add(i)
-                else:
-                    init_input.append(i)
-        #print(all_inputs)
-        #获取子图输出node
-        all_outputs = set()
-        for n_name in sub_t.leaf_nodes:
-            n = self.node_dict[n_name]
-            all_outputs.update(n.output)
-        #print(all_outputs)
-        return list(all_inputs), list(all_outputs)
-
     def exe(self):
         sub_digraphs = self._get_sub_digraphs()
         print("=========valid sub num:%d============"%len(sub_digraphs))
@@ -89,10 +69,19 @@ class Transgraph(object):
 
             #子图权重切割出来，并导出
             sub_model = CutGraph().cut_in(self.model, start_n_name=sub_t.root_nodes, end_n_name=sub_t.leaf_nodes)
-            onnx.save(sub_model, "{}.onnx".format(sub_name))
-            #print(sub_t.root_nodes)
-            #print(sub_t.leaf_nodes)
-            all_inputs, all_outputs = self._get_sub_io_node_info(sub_t)
+            sub_model_name = "{}.onnx".format(sub_name)
+            onnx.save(sub_model, sub_model_name)
+            sub_onnx_graph = sub_model.graph
+            #根据input信息设置模型输入graph shape
+            inputs_ = []      
+            outputs_ = []
+            for input_tensor in sub_onnx_graph.input:
+                if input_tensor.name not in self.init_dict.keys():
+                    inputs_.append(input_tensor.name)
+
+            for output_tensor in sub_onnx_graph.output:
+                outputs_.append(output_tensor.name)
+
             '''
             #print(self.val_info_dict)
             for node_name in  self.val_info_dict:
@@ -103,9 +92,9 @@ class Transgraph(object):
             '''
             #创建新节点
             new_node = onnx.helper.make_node(
-                op_type="subgraph",
-                inputs=all_inputs,
-                outputs=all_outputs,
+                op_type="SubGraph",
+                inputs=inputs_,
+                outputs=outputs_,
                 name=sub_name
             )
             self.model.graph.node.append(new_node)#新节点插入图中
@@ -113,7 +102,7 @@ class Transgraph(object):
             useless_nodes = [self.node_dict[i] for i in sub_t.all_nodes]
             self.remove_useless(useless_nodes)
 
-        onnx.save(self.model, "test_fuse.onnx")#保存融合后的模型
+        onnx.save(self.model, "fuse_graph.onnx")#保存融合后的模型
 
     def remove_useless(self, nodes):
         '''
@@ -182,6 +171,7 @@ class Transgraph(object):
         self.val_info_dict = {}
         self.node_by_input = collections.defaultdict(list)
         self.node_by_output = {}
+        self.nodes_io_info = {}
 
         # update
         self.node_dict = {n.name: n for n in self.model.graph.node}
@@ -190,6 +180,7 @@ class Transgraph(object):
         self.val_info_dict.update({n.name: n for n in self.model.graph.input})
         self.val_info_dict.update({n.name: n for n in self.model.graph.output})
         for n in self.model.graph.node:
+            self.nodes_io_info[n.name]={'input':[],'output':[]}
             for i in n.input:
                 self.node_by_input[i].append(n)
             for o in n.output:
@@ -229,6 +220,8 @@ class Transgraph(object):
                     self.input_nodes_is_cpu_set.add(nbr)
                 if dig_nodes[nbr].get("hd_type") == "cpu":
                     self.output_nodes_is_cpu_set.add(name)
+                self.nodes_io_info[name]['output'].append(nbr)
+                self.nodes_io_info[nbr]['input'].append(name)
 
         #按照支持npu属性的node划分子图
         dig_nodes = [
@@ -238,10 +231,7 @@ class Transgraph(object):
             if data.get("hd_type") == "npu"
         ]
 
-        self._remove_digraphs_cycle(dig_nodes)
-        npu_subgraphs = self.di_no_cycle_graph.subgraph(dig_nodes)
-        #过滤符合条件的子图
-        valid_sub_digraphs = self._filter_subgraphs(npu_subgraphs)
+        valid_sub_digraphs = self._remove_digraphs_cycle(dig_nodes)
         return valid_sub_digraphs 
 
     def _is_all_npu_node(self, nodes):
@@ -253,62 +243,56 @@ class Transgraph(object):
                 ret = False
                 break
         return ret
-        
-    def _remove_digraphs_cycle(self, dig_nodes):
-        self.di_no_cycle_graph = copy.deepcopy(self.di_graph)
+    
+    def _topological_sort(self, nodes):
+            di_topo_nodes = list(nx.topological_sort(self.di_graph))
+            sort_nodes = []
+            for x in di_topo_nodes:
+                if x in nodes:
+                    sort_nodes.append(x)
+            return sort_nodes
 
+    def _remove_digraphs_cycle(self, dig_nodes):
         npu_dig_subgraphs = self.di_graph.subgraph(dig_nodes)
         #先过滤下不符合条件的子图
         filter_sub_digraphs = self._filter_subgraphs(npu_dig_subgraphs)
-        #处理子图
-        all_need_cut_edges = []
+        #处理子图(可能存在于子图之外的环路，需要继续切割子图)
+        tmp_di_graph = copy.deepcopy(self.di_graph)#切掉子图所有环路临时需要的整图
         for sub in filter_sub_digraphs:
             sub_t    = Subgraph(sub)
+            #子图的根、叶子节点按照整网拓扑排序
+            sub_t.root_nodes = self._topological_sort(sub_t.root_nodes)
+            sub_t.leaf_nodes = self._topological_sort(sub_t.leaf_nodes)
+            #print(sub_t.root_nodes)
+            #print(sub_t.leaf_nodes)
+            for leaf in sub_t.leaf_nodes:
+                for root in sub_t.root_nodes:
+                    while nx.has_path(tmp_di_graph, leaf, root):#如果npu子图的叶子到根有路，肯定是CPU的通路
+                        #print("%s to % has_path"%(leaf, root))
+                        all_paths = list(nx.all_shortest_paths(tmp_di_graph.to_undirected(), leaf, root))
+                        for path in all_paths:#记录切断叶子output环路
+                            topo_1_leaf = self._topological_sort(path)[0]
+                            for i in self.nodes_io_info[topo_1_leaf]['output']:
+                                edge   = (topo_1_leaf, i)
+                                #print(edge)
+                                if edge in tmp_di_graph.edges:
+                                    tmp_di_graph.remove_edge(*edge)
+            #记录子图根与input的边切断；
+            for root in sub_t.root_nodes:
+                for i in self.nodes_io_info[root]['input']:
+                    edge   = (i, root)
+                    #print(edge)
+                    if edge in tmp_di_graph.edges:
+                        tmp_di_graph.remove_edge(*edge)
 
-            hit_in  = set(sub_t.all_nodes) & self.input_nodes_is_cpu_set
-            hit_out = set(sub_t.all_nodes) & self.output_nodes_is_cpu_set
+        npu_subs = []
+        subs = self._filter_subgraphs(tmp_di_graph)#找出所有处理后的子图
+        for sub in subs:
+            list(nx.topological_sort(sub))
+            if self._is_all_npu_node(list(nx.topological_sort(sub))):#只返回全部NPU节点的子图
+                npu_subs.append(sub)
+        return npu_subs
 
-            #补全子图(加入CPU的节点，查看是否有环路)
-            amend_sub_nodes_name = self._find_node(sub_t.root_nodes, sub_t.leaf_nodes)
-            amend_nodes = [
-                node
-                for node, data
-                in self.di_graph.nodes(data=True)
-                if node in set(amend_sub_nodes_name)
-            ]
-            tmp_di_graph = copy.deepcopy(self.di_no_cycle_graph)#切掉所有环路临时需要的图
-            amend_dig_sub = tmp_di_graph.subgraph(amend_nodes)
-            sub_cycles = nx.cycle_basis(amend_dig_sub.to_undirected())#得到环路
-            #拆掉除了CPU通路之外的其它路径
-            for cycle in sub_cycles:
-                amend_dig_sub = tmp_di_graph.subgraph(amend_nodes)#tmp_di_graph切过一次后再次更新amend_dig_sub
-                if len(hit_out & set(cycle)) > 0  and len(hit_in & set(cycle)) > 0:#有NPU和CPU一起参与的环路
-                    start_node = list(hit_out & set(cycle))[0]#NPU子图中环的开始节点
-                    end_node = list(hit_in & set(cycle))[0]#NPU子图中环的结束节点
-                    if start_node == end_node:
-                        continue
-                    #尝试切断起始节点的所有通路，存储下来切断纯粹NPU路径的的边，反馈给最终的图
-                    if nx.has_path(amend_dig_sub.to_undirected(), start_node, end_node):
-                        all_paths = list(nx.all_shortest_paths(amend_dig_sub.to_undirected(), start_node, end_node))
-                        for path in all_paths:                            
-                            edge   = ()
-                            edge_r = (path[0], path[1])#选择从起始节点切
-                            edge_l = (path[1], path[0])
-                            if edge_r in tmp_di_graph.edges:
-                                edge = edge_r
-                            if edge_l in tmp_di_graph.edges:
-                                edge = edge_l
-
-                            if len(edge) == 2:
-                                tmp_di_graph.remove_edge(*edge)
-                                if self._is_all_npu_node(path):
-                                 all_need_cut_edges.append(edge)
-        
-        #print(all_need_cut_edges)
-        #切断所有NPU环路
-        for edge in all_need_cut_edges:
-            self.di_no_cycle_graph.remove_edge(*edge)
- 
     def _filter_subgraphs(self, npu_subgraphs):
         #找到所有独立子图，并且按照子图长度从大到小排序
         npu_subgraphs_sort = sorted(nx.connected_components(npu_subgraphs.to_undirected()), key=len, reverse=True)
@@ -333,26 +317,3 @@ class Transgraph(object):
             val.name = n.output[0]
             self.model.graph.initializer.append(val)
             self.model.graph.node.remove(n)
-
-    def _find_node(self, start_nodes, end_nodes):
-        '''
-        Find these nodes between start_nodes(included) and end_nodes(included) by recursion.
-        :param start_nodes:
-        :param end_nodes:
-        :return:
-        '''
-        nodes = []
-        def _recursion(n):
-            if n.name in end_nodes or n.name in nodes:
-                return
-            if n.name != "":
-                nodes.append(n.name)
-            for o in n.output:
-                for i in self.node_by_input[o]:
-                    _recursion(i)
-
-        for s in start_nodes:
-            n = self.node_dict[s]
-            _recursion(n)
-        nodes.extend(end_nodes)
-        return nodes
