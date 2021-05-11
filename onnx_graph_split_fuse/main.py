@@ -36,7 +36,9 @@ def main(argv):
     parser.add_argument("--src_model", required=True, help="Onnx model file path.")
     parser.add_argument('--inputs', required=True, nargs='*', 
                        help="""Input tensors info: "input_name;elem_type;dim0;dim1;dim2;dim3" 
-                               \r\n Example: "in0;1;1;224;2224;3" "in1;1;1;32;32;128" """)
+                               \r\n Example: "in0;1;1;224;224;3" "in1;1;1;32;32;128" """)
+    parser.add_argument('--tensor_format', type=str, default='NCHW',
+                       help="Model default tensor format")                               
     parser.add_argument("--hd_type", required=True, help="Target device hardware type.")
     parser.add_argument('--max_sub_num', default=128,
                         help='The max number of npu subgraph')
@@ -79,14 +81,13 @@ def main(argv):
     onnx.checker.check_model(inferred_model)
 
     #获取目标硬件支持的op list
-    hd_op_list_file = "hardware/{}/support_op_list.txt".format(args.hd_type)
-    hd_op_type = set()
-    for line in open(hd_op_list_file): 
+    npu_op_list_file = "hardware/{}/support_op_list.txt".format(args.hd_type)
+    npu_op_types = set()#NOT FOUND! ERROR
+    for line in open(npu_op_list_file): 
         line=line.strip('\n')
-        hd_op_type.add(line)
-    #print(hd_op_type)
+        npu_op_types.add(line)
 
-    sf = Transgraph(inferred_model, hd_op_type, args.max_sub_num, args.min_node_num)
+    sf = Transgraph(inferred_model, args.tensor_format, npu_op_types, args.max_sub_num, args.min_node_num)
     sf.exe()
 
 if __name__ == "__main__":

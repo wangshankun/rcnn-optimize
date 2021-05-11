@@ -1,6 +1,5 @@
 Clip
 Relu
-MaxPool
 Concat
 Reshape
 Transpose
@@ -11,4 +10,3 @@ Mul
 Less
 Slice
 Cast
-
