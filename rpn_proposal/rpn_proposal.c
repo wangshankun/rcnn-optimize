@@ -40,8 +40,8 @@ static float box_intersection(box a, box b)
 {    
     float w = fminf(a.x2, b.x2) - fmaxf(a.x1, b.x1) + 1;
     float h = fminf(a.y2, b.y2) - fmaxf(a.y1, b.y1) + 1;
-    //if(w < 0 || h < 0) return 0;减少一个判断节省30%时间
-    //因为最终是与thresh_float对比，即使重合面积是负数不影响判断
+    //if(w < 0 || h < 0) return 0;减少一个判断节省30%时间，这种情况下证明是没有交集的
+    //因为最终是与thresh_float对比，即使重合面积是负数不影响判断,因为负数肯定小于0，比较大小足够了，没必要非得用0
     return w*h;
 }
 
