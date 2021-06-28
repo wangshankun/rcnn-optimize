@@ -1,113 +1,133 @@
 #include "model_process.h"
+#include "sample_db.h"
 
 #if defined(__cplusplus)
-extern "C"
-#endif
-int face_det(dl_matrix3du_t* org_img, dl_matrix3du_t* det_face_img)
+extern "C" {
+
+int Destory(FaceHandle_t* handle)
 {
-    int in_w = 128; int in_h = 128;//模型的输入尺寸
-    float mean = 127.0; float norm = 1.0/128.0;
-    float threshold = 0.5; 
-    float scale_w = (float)org_img->w / (float)in_w;
-    float scale_h = (float)org_img->h / (float)in_h;
-    
-    vector<vector<float>> priors;
-    generate_anchor(priors, in_w, in_h);
-    //预处理
-    pre_process_resize_norm(org_img->item,            org_img->w, org_img->h,
-                            (float*)input_live_Addr,  in_w ,      in_h, 
-                            mean, norm);
-    int errCode = live_128(live_constantWeight, live_mutableWeight, live_activations);
-    if (errCode != GLOW_SUCCESS)
+    if(handle->db_data != NULL)
     {
-        printf("FaceDet: Error running bundle: error code %d\n", errCode);
-        return errCode;
+        free(handle->db_data);
     }
-    ObjBbox_t target_box;
-    generate_target_box(target_box, priors, (float*)output_score_Addr, (float*)output_boxes_Addr, threshold, 128, 128);
-    
-    printf("%f %f %f %f %f\r\n",target_box.x1 * scale_w, target_box.y1*scale_h,target_box.x2*scale_w,target_box.y2*scale_h,target_box.score);
-    
-    float x1 = target_box.x1 * scale_w;
-    float y1 = target_box.y1 * scale_h;
-    float x2 = target_box.x2 * scale_w;
-    float y2 = target_box.y2 * scale_h;
-    unsigned char* crop_img = crop_pad_square(org_img->item, x1, y1, x2, y2, org_img->w, org_img->h);
-    int h = y2 - y1 + 1;
-    int w = x2 - x1 + 1;
-    int s = (h >= w) ? h : w;
-    det_face_img->n = 1;
-    det_face_img->c = 1;
-    det_face_img->h = s;
-    det_face_img->w = s;
-    det_face_img->item = crop_img;
-    det_face_img->stride = s;
     return 0;
 }
 
-#if defined(__cplusplus)
-extern "C"
-#endif
-int face_align(dl_matrix3du_t* det_face_img, dl_matrix3du_t* face_align_img)
+int Init(FaceHandle_t* handle)
 {
-    int square = det_face_img->w;//上一步骤已经padding成方形图
-    int in_w = 120; int in_h = 120;//模型的输入尺寸,方形
-    float scale = (float)square / (float)in_w;
-    
-    pre_process_resize(det_face_img->item, square, square, (float*)input_lt_floor_Addr, in_w, in_h);
+    if(handle == NULL)
+    {
+        printf("FaceHandle is not init!\r\n");
+        return -1;
+    }
+    if(handle->db_path == NULL)
+    {
+        printf("Init Error: db_path is empty! \r\n");
+        return -1;
+    }
 
-    int errCode = lt_floor(lt_floor_constantWeight, lt_floor_mutableWeight, lt_floor_activations);
-    if (errCode != GLOW_SUCCESS)
+    int db_bytes = -1;
+    uint8_t* db_data = _read_db_file_content(handle->db_path, &db_bytes);
+    if(db_bytes == -1)
     {
-        printf("LandMark: Error running bundle: error code %d\n", errCode);
+        handle->db_data  = NULL;
+        handle->db_bytes = -1;
+        printf("Init Error: Create DB Failed!\r\n");
         return -1;
     }
-    float landmark[10];
-    //后处理获得landmark
-    decode_landmark(landmark, (float*)output_probe_Addr, (float*)output_probe_x_Addr, (float*)output_probe_y_Addr);
-    trans_coords(landmark, scale);
-    //仿射变换对齐人脸
-    uint8_t* align_img = (uint8_t*)malloc(square * square);
-    if(align_face(det_face_img->item, square, align_img, square, landmark) != 0)
-    {
-        printf("Error align face! \r\n");
-        return -1;
-    }
-    face_align_img->n = 1;
-    face_align_img->c = 1;
-    face_align_img->h = square;
-    face_align_img->w = square;
-    face_align_img->item = align_img;
-    face_align_img->stride = square;
+    handle->db_data  = db_data;
+    handle->db_bytes = db_bytes;
     return 0;
 }
 
-#if defined(__cplusplus)
-extern "C"
-#endif
-int face_recong(dl_matrix3du_t* face_align_img, dl_matrix3d_t* face_vector)
+int AddOneItem(FaceHandle_t* handle, const char* key, dl_matrix3du_t* input_img)
 {
-    int in_w = 56; int in_h = 56;//模型的输入尺寸,方形
-    float mean = 127.5; float norm = 1.0/128.0;
-    int out_size = 64;
-    pre_process_resize_norm(face_align_img->item,          face_align_img->w, face_align_img->h,
-                            (float*)input_facerecong_Addr, in_w ,      in_h, 
-                            mean, norm);
-    //savefile("facerecong_input.bin", input_facerecong_Addr, 12544);
-    int errCode = facerecong(facerecong_constantWeight, facerecong_mutableWeight, facerecong_activations);
-    if (errCode != GLOW_SUCCESS)
+    if(handle->db_bytes == -1)
     {
-        printf("FaceRecong: Error running bundle: error code %d\n", errCode);
         return -1;
     }
-    float* vector = (float*)malloc(out_size * sizeof(float));
-    memcpy(vector, output_facerecong_Addr, out_size * sizeof(float));
-    face_vector->n = 1;
-    face_vector->c = 1;
-    face_vector->h = 1;
-    face_vector->w = out_size;
-    face_vector->item = vector;
-    face_vector->stride = out_size;
-    
+    if(!check_input_img(input_img))
+    {
+        return -1;
+    }
+    if(strlen(key) >= 64)//key小于64个字符
+    {
+        printf("Error, the key's len out of db range! \r\n");
+        return -1;
+    }
+    //输入图片输出vector
+    dl_matrix3d_t face_id; face_id.item = NULL;
+    if(generate_face_id(input_img, &face_id, handle->det_th_hold) != 0)
+    //为了尽快释放input_img内存，input_img内存释放在generate_face_id里面做
+    {
+        if(face_id.item != NULL)
+        {
+            free(face_id.item); face_id.item == NULL;
+        }
+        printf("Error, generate_face_id failed! \r\n");
+        return -1;
+    }
+
+     if(0 != add_face_id(handle, key, &face_id))
+     {
+        if(face_id.item != NULL)
+        {
+            free(face_id.item); face_id.item == NULL;
+        } 
+         return -1;
+     }
+
+    if(face_id.item != NULL)
+    {
+        free(face_id.item); face_id.item == NULL;
+    } 
     return 0;
 }
+
+int DisableOneItem(FaceHandle_t* handle, const char* key)
+{
+    if(!check_input_handle(handle))
+    {
+        return -1;
+    }
+    if(strlen(key) >= 64 )//key小于64个字符
+    {
+        printf("Error, the key's len out of db range! \r\n");
+        return -1;
+    }
+    return disable_face_id(handle, key);
+}
+
+bool SearchOneItem(FaceHandle_t* handle, dl_matrix3du_t* intput_img)
+{
+    if(!check_input_img(intput_img) || !check_input_handle(handle))
+    {
+        return false;
+    }
+
+    if(handle->db_bytes <=0)
+    {
+        return false;
+    }
+
+    dl_matrix3d_t face_id; face_id.item = NULL;
+    if (generate_face_id(intput_img, &face_id, handle->det_th_hold) != 0)
+    {
+        if(face_id.item != NULL)
+        {
+            free(face_id.item);
+        }
+        return false;
+    }
+
+    bool ret = search_face_id(handle, &face_id);
+    if(face_id.item != NULL)
+    {
+        free(face_id.item);
+    }
+
+    return ret;
+}
+
+}
+#endif

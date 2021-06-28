@@ -34,44 +34,32 @@ typedef uint8_t uc_t;
 
 typedef struct
 {
-    int w;        /*!< Width */
-    int h;        /*!< Height */
-    int c;        /*!< Channel */
-    int n;        /*!< Number of filter, input and output must be 1 */
-    int stride;   /*!< Step between lines */
-    float *item; /*!< Data */
+    int w = 0;        /*!< Width */
+    int h = 0;        /*!< Height */
+    int c = 0;        /*!< Channel */
+    int n = 0;        /*!< Number of filter, input and output must be 1 */
+    int stride = 0;   /*!< Step between lines */
+    float *item = NULL; /*!< Data */
 } dl_matrix3d_t;
 
 typedef struct
 {
-    int w;      /*!< Width */
-    int h;      /*!< Height */
-    int c;      /*!< Channel */
-    int n;      /*!< Number of filter, input and output must be 1 */
-    int stride; /*!< Step between lines */
-    uint8_t *item; /*!< Data */
+    int w = 0;      /*!< Width */
+    int h = 0;      /*!< Height */
+    int c = 0;      /*!< Channel */
+    int n = 0;      /*!< Number of filter, input and output must be 1 */
+    int stride = 0; /*!< Step between lines */
+    uint8_t *item = NULL; /*!< Data */
 } dl_matrix3du_t;
 
 typedef float matrixType;
 typedef struct
 {
-    int w;              /*!< width */
-    int h;              /*!< height */
-    matrixType **array; /*!< array */
+    int w = 0;              /*!< width */
+    int h = 0;              /*!< height */
+    matrixType **array = NULL; /*!< array */
 } Matrix;
 
-void l2_norm(dl_matrix3d_t *feature)
-{
-    int len = feature->w * feature->h * feature->c;
-    fptp_t norm = 0;
-    for(int i=0;i<len;i++){
-        norm += (feature->item[i] * feature->item[i]);
-    }
-    norm = sqrt(norm);
-    for(int i=0;i<len;i++){
-        feature->item[i] /= norm;
-    }
-}
 
 Matrix *matrix_alloc(int h, int w)
 {
@@ -370,113 +358,55 @@ void warp_affine(dl_matrix3du_t *img, dl_matrix3du_t *crop, Matrix *M)
     matrix_free(M_inv);
 }
 
-dl_matrix3d_t *get_face_id(dl_matrix3du_t *aligned_face)
+/////////////////////////////////////////////////////////////////////////////////////////////////
+void l2_norm(dl_matrix3d_t *feature)
 {
-    dl_matrix3d_t *face_id = NULL;
-    //face_id从人脸识别模型导出来一个vector
-    l2_norm(face_id);
-    return face_id;
+    int len = feature->w * feature->h * feature->c;
+    fptp_t norm = 0;
+    for(int i=0;i<len;i++){
+        norm += (feature->item[i] * feature->item[i]);
+    }
+    norm = sqrt(norm);
+    for(int i=0;i<len;i++){
+        feature->item[i] /= norm;
+    }
+}
+
+//已经做过l2_norm可以用cos_distance_unit_id计算余弦距离
+fptp_t cos_distance_unit_id(dl_matrix3d_t *id_1,
+                    dl_matrix3d_t *id_2)
+{
+    uint16_t c = id_1->c;
+    fptp_t dist = 0;
+    for (uint16_t i = 0; i < c; i++)
+    {
+        dist += ((id_1->item[i]) * (id_2->item[i]));
+    }
+    return dist;
+}
+
+//直接计算两mat的余弦距离
+fptp_t cos_distance(dl_matrix3d_t *id_1,
+                    dl_matrix3d_t *id_2)
+{
+    uint16_t c = id_1->c;
+    fptp_t l2_norm_1 = 0;
+    fptp_t l2_norm_2 = 0;
+    fptp_t dist = 0;
+    for (int i = 0; i < c; i++)
+    {
+        l2_norm_1 += ((id_1->item[i]) * (id_1->item[i]));
+        l2_norm_2 += ((id_2->item[i]) * (id_2->item[i]));
+    }
+    l2_norm_1 = sqrt(l2_norm_1);
+    l2_norm_2 = sqrt(l2_norm_2);
+    for (uint16_t i = 0; i < c; i++)
+    {
+        dist += ((id_1->item[i]) * (id_2->item[i]) / (l2_norm_1 * l2_norm_2));
+    }
+    return dist;
 }
 
 
-void image_cropper(uint8_t *rot_data, uint8_t *src_data, int rot_w, int rot_h, int rot_c, int src_w, int src_h, float rotate_angle, float ratio, float *center)
-{ /*{{{*/
-    int rot_stride = rot_w * rot_c;
-    float rot_w_start = 0.5f - (float)rot_w / 2;
-    float rot_h_start = 0.5f - (float)rot_h / 2;
-
-    //rotate_angle must be radius
-    float si = sin(rotate_angle);
-    float co = cos(rotate_angle);
-
-    int src_stride = src_w * rot_c;
-
-    for (int y = 0; y < rot_h; y++)
-    {
-        for (int x = 0; x < rot_w; x++)
-        {
-            float xs, ys, xr, yr;
-            xs = ratio * (rot_w_start + x);
-            ys = ratio * (rot_h_start + y);
-
-            xr = xs * co + ys * si;
-            yr = -xs * si + ys * co;
-
-            float fy[2];
-            fy[0] = center[1] + yr; // y
-            int src_y = (int)fy[0]; // y1
-            fy[0] -= src_y;         // y - y1
-            fy[1] = 1 - fy[0];      // y2 - y
-            src_y = DL_IMAGE_MAX(0, src_y);
-            src_y = DL_IMAGE_MIN(src_y, src_h - 2);
-
-            float fx[2];
-            fx[0] = center[0] + xr; // x
-            int src_x = (int)fx[0]; // x1
-            fx[0] -= src_x;         // x - x1
-            if (src_x < 0)
-            {
-                fx[0] = 0;
-                src_x = 0;
-            }
-            if (src_x > src_w - 2)
-            {
-                fx[0] = 0;
-                src_x = src_w - 2;
-            }
-            fx[1] = 1 - fx[0]; // x2 - x
-
-            for (int c = 0; c < rot_c; c++)
-            {
-                rot_data[y * rot_stride + x * rot_c + c] = round(src_data[src_y * src_stride + src_x * rot_c + c] * fx[1] * fy[1] + src_data[src_y * src_stride + (src_x + 1) * rot_c + c] * fx[0] * fy[1] + src_data[(src_y + 1) * src_stride + src_x * rot_c + c] * fx[1] * fy[0] + src_data[(src_y + 1) * src_stride + (src_x + 1) * rot_c + c] * fx[0] * fy[0]);
-            }
-        }
-    }
-} /*}}}*/
-
-void image_resize_linear(uint8_t *dst_image, uint8_t *src_image, int dst_w, int dst_h, int dst_c, int src_w, int src_h)
-{ /*{{{*/
-    float scale_x = (float)src_w / dst_w;
-    float scale_y = (float)src_h / dst_h;
-
-    int dst_stride = dst_c * dst_w;
-    int src_stride = dst_c * src_w;
-    {
-        for (int y = 0; y < dst_h; y++)
-        {
-            float fy[2];
-            fy[0] = (float)((y + 0.5) * scale_y - 0.5); // y
-            int src_y = (int)fy[0];                     // y1
-            fy[0] -= src_y;                             // y - y1
-            fy[1] = 1 - fy[0];                          // y2 - y
-            src_y = DL_IMAGE_MAX(0, src_y);
-            src_y = DL_IMAGE_MIN(src_y, src_h - 2);
-
-            for (int x = 0; x < dst_w; x++)
-            {
-                float fx[2];
-                fx[0] = (float)((x + 0.5) * scale_x - 0.5); // x
-                int src_x = (int)fx[0];                     // x1
-                fx[0] -= src_x;                             // x - x1
-                if (src_x < 0)
-                {
-                    fx[0] = 0;
-                    src_x = 0;
-                }
-                if (src_x > src_w - 2)
-                {
-                    fx[0] = 0;
-                    src_x = src_w - 2;
-                }
-                fx[1] = 1 - fx[0]; // x2 - x
-
-                for (int c = 0; c < dst_c; c++)
-                {
-                    dst_image[y * dst_stride + x * dst_c + c] = round(src_image[src_y * src_stride + src_x * dst_c + c] * fx[1] * fy[1] + src_image[src_y * src_stride + (src_x + 1) * dst_c + c] * fx[0] * fy[1] + src_image[(src_y + 1) * src_stride + src_x * dst_c + c] * fx[1] * fy[0] + src_image[(src_y + 1) * src_stride + (src_x + 1) * dst_c + c] * fx[0] * fy[0]);
-                }
-            }
-        }
-    }
-} /*}}}*/
 
 #endif

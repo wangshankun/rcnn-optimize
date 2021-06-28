@@ -5,7 +5,7 @@ mkdir $WSPACE/build
 cd $WSPACE/build
 
 #编译人脸库
-g++ -g -c -I"$WSPACE/model_bin" $WSPACE/src/sail_face_watch.cpp -o sail_face_watch.o 
+g++ -c -I"$WSPACE/model_bin" $WSPACE/src/sail_face_watch.cpp -o sail_face_watch.o 
 ar -cr libsail_face_watch.a sail_face_watch.o  \
       $WSPACE/model_bin/live_128.o $WSPACE/model_bin/lt_floor.o $WSPACE/model_bin/facerecong.o 
 
@@ -14,7 +14,7 @@ cd $WSPACE/example/jpg_decoder && make
 
 #链接
 cd $WSPACE/build
-g++ -g -no-pie $WSPACE/example/main.cpp  \
+g++ -static -no-pie $WSPACE/example/main.cpp  \
      -L"$WSPACE/build" -lsail_face_watch -lm \
      -L"$WSPACE/example/jpg_decoder" -lffjpeg \
      -I"$WSPACE/example/jpg_decoder" \

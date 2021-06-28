@@ -98,7 +98,7 @@ void pre_process_resize_norm(unsigned char* in_array, short width, short height,
     float w_times = (float)out_width / (float)width;
     short x1, y1, x2, y2, f11, f12, f21, f22;
     float x, y;
- 
+    
     for (int i = 0; i < out_height; i++)
     {
         for (int j = 0; j < out_width; j++)
@@ -382,8 +382,8 @@ int  align_face(uint8_t* src_img, int src_w,
                 float*landmark_p)
 {
     //人脸参数校准坐标:对于112x112
-    static float dst_ldk_x[5] = {38.2946,73.5318,56.0252,41.5493,70.729904};
-    static float dst_ldk_y[5] = {51.6963,51.5014,71.7366,92.3655,92.2041};
+    float dst_ldk_x[5] = {38.2946,73.5318,56.0252,41.5493,70.729904};
+    float dst_ldk_y[5] = {51.6963,51.5014,71.7366,92.3655,92.2041};
     //适配传入图片尺寸的校准坐标
     dst_ldk_x[0] = src_w / 112.0 * dst_ldk_x[0];
     dst_ldk_y[0] = src_w / 112.0 * dst_ldk_y[0];
@@ -457,5 +457,145 @@ uint8_t facerecong_activations[FACERECONG_ACTIVATIONS_MEM_SIZE];
 uint8_t *input_facerecong_Addr  = GLOW_GET_ADDR(facerecong_mutableWeight, FACERECONG_input_1);
 /// Bundle output data absolute address.
 uint8_t *output_facerecong_Addr = GLOW_GET_ADDR(facerecong_mutableWeight, FACERECONG_A124);
+
+
+/////////////////////////////模型执行过程封装//////////////////////////////////////////////////
+
+static int face_det(dl_matrix3du_t* org_img, dl_matrix3du_t* det_face_img, float threshold = 0.5)
+{
+    int in_w = 128; int in_h = 128;//模型的输入尺寸
+    float mean = 127.0; float norm = 1.0/128.0;
+    float scale_w = (float)org_img->w / (float)in_w;
+    float scale_h = (float)org_img->h / (float)in_h;
+    
+    vector<vector<float>> priors;
+    generate_anchor(priors, in_w, in_h);
+    //预处理
+    pre_process_resize_norm(org_img->item,            org_img->w, org_img->h,
+                            (float*)input_live_Addr,  in_w ,      in_h, 
+                            mean, norm);
+    int errCode = live_128(live_constantWeight, live_mutableWeight, live_activations);
+    if (errCode != GLOW_SUCCESS)
+    {
+        printf("FaceDet: Error running bundle: error code %d\n", errCode);
+        return errCode;
+    }
+    ObjBbox_t target_box; memset(&target_box, 0, sizeof(target_box));
+    generate_target_box(target_box, priors, (float*)output_score_Addr, (float*)output_boxes_Addr, threshold, 128, 128);
+    
+    printf("%f %f %f %f %f\r\n",target_box.x1 * scale_w, target_box.y1*scale_h,target_box.x2*scale_w,target_box.y2*scale_h,target_box.score);
+    if(target_box.score < threshold)
+    {
+        printf("Not Found Face!\n");
+        return -1;
+    }
+    
+    float x1 = target_box.x1 * scale_w;
+    float y1 = target_box.y1 * scale_h;
+    float x2 = target_box.x2 * scale_w;
+    float y2 = target_box.y2 * scale_h;
+    unsigned char* crop_img = crop_pad_square(org_img->item, x1, y1, x2, y2, org_img->w, org_img->h);
+    int h = y2 - y1 + 1;
+    int w = x2 - x1 + 1;
+    int s = (h >= w) ? h : w;
+    det_face_img->n = 1;
+    det_face_img->c = 1;
+    det_face_img->h = s;
+    det_face_img->w = s;
+    det_face_img->item = crop_img;
+    det_face_img->stride = s;
+
+    return 0;
+}
+
+static int face_align(dl_matrix3du_t* det_face_img, dl_matrix3du_t* face_align_img)
+{
+    int square = det_face_img->w;//上一步骤已经padding成方形图
+    int in_w = 120; int in_h = 120;//模型的输入尺寸,方形
+    float scale = (float)square / (float)in_w;
+
+    pre_process_resize(det_face_img->item, square, square, (float*)input_lt_floor_Addr, in_w, in_h);
+
+    int errCode = lt_floor(lt_floor_constantWeight, lt_floor_mutableWeight, lt_floor_activations);
+    if (errCode != GLOW_SUCCESS)
+    {
+        printf("LandMark: Error running bundle: error code %d\n", errCode);
+        return -1;
+    }
+    float landmark[10] = {};
+    //后处理获得landmark
+    decode_landmark(landmark, (float*)output_probe_Addr, (float*)output_probe_x_Addr, (float*)output_probe_y_Addr);
+    trans_coords(landmark, scale);
+    //仿射变换对齐人脸
+    uint8_t* align_img = (uint8_t*)malloc(square * square);
+
+    if(align_face(det_face_img->item, square, align_img, square, landmark) != 0)
+    {
+        printf("Error align face! \r\n");
+        return -1;
+    }
+    face_align_img->n = 1;
+    face_align_img->c = 1;
+    face_align_img->h = square;
+    face_align_img->w = square;
+    face_align_img->item = align_img;
+    face_align_img->stride = square;
+    return 0;
+}
+
+static int face_recong(dl_matrix3du_t* face_align_img, dl_matrix3d_t* face_vector)
+{
+    int in_w = 56; int in_h = 56;//模型的输入尺寸,方形
+    float mean = 127.5; float norm = 1.0/128.0;
+    int out_size = 64;
+    pre_process_resize_norm(face_align_img->item,          face_align_img->w, face_align_img->h,
+                            (float*)input_facerecong_Addr, in_w ,      in_h, 
+                            mean, norm);
+
+    int errCode = facerecong(facerecong_constantWeight, facerecong_mutableWeight, facerecong_activations);
+    if (errCode != GLOW_SUCCESS)
+    {
+        printf("FaceRecong: Error running bundle: error code %d\n", errCode);
+        return -1;
+    }
+    float* vector = (float*)malloc(out_size * sizeof(float));
+    memcpy(vector, output_facerecong_Addr, out_size * sizeof(float));
+    face_vector->n = 1;
+    face_vector->c = 64;//模型的输出是64个float组成的vector
+    face_vector->h = 0;
+    face_vector->w = 0;
+    face_vector->item = vector;
+    face_vector->stride = 0;
+    return 0;
+}
+
+static int generate_face_id(dl_matrix3du_t* org_img_p, dl_matrix3d_t* face_vector_p, float threshold = 0.5)
+{
+    dl_matrix3du_t  det_face_img, face_align_img;
+    if(face_det(org_img_p, &det_face_img, threshold) != 0)
+    {
+        free(org_img_p->item); org_img_p->item = NULL;
+        return -1;
+    }
+    free(org_img_p->item); org_img_p->item = NULL;
+
+    if(face_align(&det_face_img, &face_align_img) != 0)
+    {
+        printf("Face Align Error! \r\n");
+        free(det_face_img.item); det_face_img.item = NULL;
+        return -1;
+    }
+    free(det_face_img.item); det_face_img.item = NULL;
+    
+    if(face_recong(&face_align_img, face_vector_p) != 0)
+    {
+        printf("Face Recong Error! \r\n");
+        free(face_align_img.item); face_align_img.item = NULL;
+        return -1;
+    }
+    free(face_align_img.item); face_align_img.item = NULL;
+    //savefile("facerecong_output.bin", face_vector_p->item, face_vector_p->w * sizeof(float));
+    return 0;
+}
 
 #endif
