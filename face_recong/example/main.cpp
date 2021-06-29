@@ -85,11 +85,6 @@ int main(int argc, const char* argv[])
         return -1;
     }
 
-    if(argc < 2)
-    {
-	printf("./test test_file_list.txt\r\n");
-	return -1;
-    }
     string pathvar(pathvar_c);
     pathvar = pathvar + "/";
     string db_path = pathvar + "test.bin";
@@ -104,12 +99,11 @@ int main(int argc, const char* argv[])
 
     ifstream fin; string line;
     //入库
-    string  input_db_file_list = pathvar + "base_clean.txt";
+    string  input_db_file_list = pathvar + "r.txt";
     fin.open(input_db_file_list);
     while (getline(fin, line)) 
     {
-        //string img_path = pathvar + line;
-        string img_path = line;
+        string img_path = pathvar + line;
         uint8_t* data;
         int w = 0;
         int h = 0;
@@ -146,7 +140,7 @@ int main(int argc, const char* argv[])
         
         vector<string> x = split(line, "/"); 
         //printf("%s \r\n", x[4].c_str()); 
-        if(AddOneItem(&face_handle, x[4].c_str(), &gray_img) != 0)
+        if(AddOneItem(&face_handle, line.c_str(), &gray_img) != 0)
         {
             printf("AddOneItem Error\r\n");
         }
@@ -154,16 +148,14 @@ int main(int argc, const char* argv[])
     fin.close();
 
     //搜库
-    string test_file(argv[1]);
-    string test_db_file_list  = pathvar + test_file;
+    string test_db_file_list  = pathvar + "t.txt";
     fin.open(test_db_file_list);
     while (getline(fin, line)) 
     {
         uint8_t* data;
         int w = 0;
         int h = 0;
-        //string img_path = pathvar + line;
-        string img_path = line;
+        string img_path = pathvar + line;
         if( 0 == jpg_decode_rgb(img_path.c_str(), &data, &w, &h))
         {
             if ( w == 0 || h == 0 )

@@ -253,7 +253,7 @@ static bool search_face_id(FaceHandle_t* handle, dl_matrix3d_t* check_id)
             id_1.item = head->id;
             float score = cos_distance(&id_1, check_id);
 
-            //printf("Key:%s RegScore:%.4f\r\n",head->key, score);
+            printf("Key:%s RegScore:%.4f\r\n",head->key, score);
             if(score >= handle->reg_th_hold)
             {
                 return true;//EEEEEEEEEEEEEEEEEEEError全量循环测试使用
