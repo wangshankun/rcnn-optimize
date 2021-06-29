@@ -12,26 +12,25 @@
 
 using namespace std;
 
-#define savefile(name, buffer, size) do\
+#define savefile(name_x_, buffer_x_, size_x_) do\
 {\
-  FILE *out = fopen(name, "wb");\
-  if(out != NULL)\
+  FILE *fp_out_x_ = fopen(name_x_, "wb");\
+  if(fp_out_x_ != NULL)\
   {\
-        fwrite (buffer , sizeof(char), size, out);\
-        fclose (out);\
+        fwrite (buffer_x_ , sizeof(char), size_x_, fp_out_x_);\
+        fclose (fp_out_x_);\
   }\
 } while(0)
 
-#define readfile(name, buffer, size) do\
+#define readfile(name_x_, buffer_x_, size_x_) do\
 {\
-  FILE *out = fopen(name, "rb");\
-  if(out != NULL)\
+  FILE *fp_out_x_ = fopen(name_x_, "rb");\
+  if(fp_out_x_ != NULL)\
   {\
-        fread (buffer , sizeof(char), size, out);\
-        fclose (out);\
+        fread (buffer_x_ , sizeof(char), size_x_, fp_out_x_);\
+        fclose (fp_out_x_);\
   }\
 } while(0)
-
 
 ////////////////////////////////////人脸检测部分/////////////////////////////////////////////
 
@@ -149,7 +148,7 @@ void generate_anchor(vector<vector<float>>& priors,
         shrinkage_size.push_back(strides);
     }
     /* generate prior anchors */
-    for (int index = 0; index < 4; index++)
+    for (int index = 0; index < min_boxes.size(); index++)
     {
         float scale_w = in_w / shrinkage_size[0][index];
         float scale_h = in_h / shrinkage_size[1][index];
@@ -250,8 +249,8 @@ unsigned char* crop_pad_square(unsigned char* in_array,
     {
         return NULL;
     }
-    int h = y2 - y1 + 1;
-    int w = x2 - x1 + 1;
+    int h = y2 - y1;
+    int w = x2 - x1;
     unsigned char* out;
     int det_front,det_back;
     if (h >= w)//高大于宽，补宽度左右两边
@@ -260,9 +259,9 @@ unsigned char* crop_pad_square(unsigned char* in_array,
         det_back  =  h - w - det_front;
         out = (unsigned char*)malloc( h * h );
         int k = 0;
-        for (int j = y1; j < y2 + 1; j++)
+        for (int j = y1; j < y2; j++)
         {
-            for(int i = x1 - det_front; i < x2 + 1 + det_back; i++)
+            for(int i = x1 - det_front; i < x2 + det_back; i++)
             {
                 if (i < x1 || i > x2)
                 {
@@ -282,7 +281,7 @@ unsigned char* crop_pad_square(unsigned char* in_array,
         det_back  =  w - h - det_front;
         out = (unsigned char*)malloc( w * w );
         int k = 0;
-        for (int j = y1 - det_front; j < y2 + 1 + det_back; j++)
+        for (int j = y1 - det_front; j < y2 + det_back; j++)
         {
             if (j < y1 || j > y2)
             {
@@ -291,7 +290,7 @@ unsigned char* crop_pad_square(unsigned char* in_array,
             }
             else
             {
-                for(int i = x1; i < x2 + 1; i++)
+                for(int i = x1; i < x2; i++)
                 {
                     out[k] = in_array[j * org_w + i];
                     k++;
@@ -377,7 +376,7 @@ void trans_coords(float* landmark, float scale, int dx = 0, int dy = 0)
 
 #include "warp_affine.h"
 
-int  align_face(uint8_t* src_img, int src_w,
+int align_face(uint8_t* src_img, int src_w,
                 uint8_t* dst_img, int dst_w,
                 float*landmark_p)
 {
@@ -410,7 +409,6 @@ int  align_face(uint8_t* src_img, int src_w,
     src_ldk_y[4] = landmark_p[9];
     //拿获取的landmark与校准坐标对比，得到变换矩阵
     Matrix *M = get_similarity_matrix(src_ldk_x, src_ldk_y, dst_ldk_x, dst_ldk_y, 5);
-    //matrix_print(M);
     if(M == NULL)
     {
         return -1;
@@ -431,8 +429,14 @@ int  align_face(uint8_t* src_img, int src_w,
     dst.item = dst_img;
     dst.stride = dst.c * dst.w;
     //执行仿射变换
-    warp_affine(&src, &dst, M);
+    int pad_count =  warp_affine(&src, &dst, M);
+    float pad_score = float(pad_count) / float(dst_w*dst_w);
+    //matrix_print(M);
     matrix_free(M);
+    if(pad_score >= 0.5)//仿射变换后如果太多padding就放弃
+    {
+	return -1;
+    }
     return 0;
 }
 
@@ -483,21 +487,30 @@ static int face_det(dl_matrix3du_t* org_img, dl_matrix3du_t* det_face_img, float
     ObjBbox_t target_box; memset(&target_box, 0, sizeof(target_box));
     generate_target_box(target_box, priors, (float*)output_score_Addr, (float*)output_boxes_Addr, threshold, 128, 128);
     
-    printf("%f %f %f %f %f\r\n",target_box.x1 * scale_w, target_box.y1*scale_h,target_box.x2*scale_w,target_box.y2*scale_h,target_box.score);
+    int x1 = int (target_box.x1 * scale_w);
+    int y1 = int (target_box.y1 * scale_h);
+    int x2 = int (target_box.x2 * scale_w);
+    int y2 = int (target_box.y2 * scale_h);
+    x1 = (x1 < 0) ? 0 : x1;
+    x2 = (x2 < 0) ? 0 : x2;
+    y1 = (y1 < 0) ? 0 : y1;
+    y2 = (y2 < 0) ? 0 : y2;
+    x1 = (x1 > org_img->w) ? org_img->w: x1;
+    x2 = (x2 > org_img->w) ? org_img->w: x2;
+    y1 = (y1 > org_img->h) ? org_img->h: y1;
+    y2 = (y2 > org_img->h) ? org_img->h: y2;
+
+    //printf("Key: %d %d %d %d %f RegScore: \r\n",x1,y1,x2,y2,target_box.score);
     if(target_box.score < threshold)
     {
         printf("Not Found Face!\n");
         return -1;
     }
     
-    float x1 = target_box.x1 * scale_w;
-    float y1 = target_box.y1 * scale_h;
-    float x2 = target_box.x2 * scale_w;
-    float y2 = target_box.y2 * scale_h;
     unsigned char* crop_img = crop_pad_square(org_img->item, x1, y1, x2, y2, org_img->w, org_img->h);
-    int h = y2 - y1 + 1;
-    int w = x2 - x1 + 1;
-    int s = (h >= w) ? h : w;
+    int h = y2 - y1;
+    int w = x2 - x1;
+    int s = (h > w) ? h : w;
     det_face_img->n = 1;
     det_face_img->c = 1;
     det_face_img->h = s;
@@ -531,6 +544,7 @@ static int face_align(dl_matrix3du_t* det_face_img, dl_matrix3du_t* face_align_i
 
     if(align_face(det_face_img->item, square, align_img, square, landmark) != 0)
     {
+        free(align_img); align_img = NULL;
         printf("Error align face! \r\n");
         return -1;
     }

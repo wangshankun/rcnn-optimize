@@ -18,7 +18,7 @@ typedef struct FaceHandle {
     uint8_t* db_data         = NULL;
     char*    db_path         = NULL;
     int      db_bytes        = -1;//初始化为负数
-    float    reg_th_hold     = 0.95;//人脸识别门限
+    float    reg_th_hold     = 0.45;//人脸识别门限
     float    det_th_hold     = 0.3;//人脸检测门限
 } FaceHandle_t;
 
@@ -252,12 +252,11 @@ static bool search_face_id(FaceHandle_t* handle, dl_matrix3d_t* check_id)
             //通过数据结构偏移找到数据库向量
             id_1.item = head->id;
             float score = cos_distance(&id_1, check_id);
-            //float score = cos_distance_unit_id(&id_1, check_id);
 
-            printf("reg score:%f\r\n",score);
+            //printf("Key:%s RegScore:%.4f\r\n",head->key, score);
             if(score >= handle->reg_th_hold)
             {
-                return true;
+                return true;//EEEEEEEEEEEEEEEEEEEError全量循环测试使用
             }
         }
         head = head + 1;//结构体指针+1

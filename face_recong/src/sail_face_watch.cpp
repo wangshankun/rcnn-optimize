@@ -64,7 +64,7 @@ int AddOneItem(FaceHandle_t* handle, const char* key, dl_matrix3du_t* input_img)
         {
             free(face_id.item); face_id.item == NULL;
         }
-        printf("Error, generate_face_id failed! \r\n");
+        printf("Error in AddOneItem, generate_face_id failed! \r\n");
         return -1;
     }
 
@@ -117,6 +117,7 @@ bool SearchOneItem(FaceHandle_t* handle, dl_matrix3du_t* intput_img)
         {
             free(face_id.item);
         }
+        printf("Error in SearchOneItem, generate_face_id failed! \r\n");
         return false;
     }
 

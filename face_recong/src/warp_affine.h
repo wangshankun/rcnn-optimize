@@ -9,26 +9,6 @@
 #define DL_IMAGE_MIN(A, B) ((A) < (B) ? (A) : (B))
 #define DL_IMAGE_MAX(A, B) ((A) < (B) ? (B) : (A))
 
-#define savefile(name, buffer, size) do\
-{\
-  FILE *out = fopen(name, "wb");\
-  if(out != NULL)\
-  {\
-        fwrite (buffer , sizeof(char), size, out);\
-        fclose (out);\
-  }\
-} while(0)
-
-#define readfile(name, buffer, size) do\
-{\
-  FILE *out = fopen(name, "rb");\
-  if(out != NULL)\
-  {\
-        fread (buffer , sizeof(char), size, out);\
-        fclose (out);\
-  }\
-} while(0)
-    
 typedef float fptp_t;
 typedef uint8_t uc_t;
 
@@ -317,8 +297,9 @@ Matrix *get_inv_affine_matrix(Matrix *m)
 }
 
 
-void warp_affine(dl_matrix3du_t *img, dl_matrix3du_t *crop, Matrix *M)
+int warp_affine(dl_matrix3du_t *img, dl_matrix3du_t *crop, Matrix *M)
 {
+    int pad_count = 0;
     Matrix *M_inv = get_inv_affine_matrix(M);
     uint8_t *dst = crop->item;
     int stride = img->w * img->c;
@@ -340,6 +321,8 @@ void warp_affine(dl_matrix3du_t *img, dl_matrix3du_t *crop, Matrix *M)
                 for (int k = 0; k < crop->c; k++)
                 {
                     *dst++ = 0;
+                    //*dst++ = 128;
+                    pad_count++;
                 }
             }
             else
@@ -356,6 +339,7 @@ void warp_affine(dl_matrix3du_t *img, dl_matrix3du_t *crop, Matrix *M)
         }
     }
     matrix_free(M_inv);
+    return pad_count;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
