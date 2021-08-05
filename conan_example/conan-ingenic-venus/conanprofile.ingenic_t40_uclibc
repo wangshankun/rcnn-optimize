@@ -1,0 +1,16 @@
+[settings]
+os=Linux
+arch=mips
+build_type=Release
+compiler=gcc
+compiler.libcxx=libstdc++
+compiler.version=7.2
+compiler.vendor=ingenic
+compiler.libc=uclibc
+
+[options]
+
+[build_requires]
+ingenic-mips/r4.0.0@hci_toolchain/dev
+
+[env]
