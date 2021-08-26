@@ -297,7 +297,6 @@ int main()
     struct timespec start, finish;
     double elapsed;
 
-
     memset(cbuff, 0 , m * n * sizeof(float));
     
     sub_pthread_init();
@@ -306,7 +305,7 @@ int main()
     clock_gettime(CLOCK_MONOTONIC, &finish);
     elapsed = (finish.tv_sec - start.tv_sec);
     elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
-    printf("4 threads sgemm_me elapsed      time:%f cbuff[128*7676]:%f\r\n",elapsed,cbuff[128*7676]);
+    printf("%d threads sgemm_me elapsed      time:%f cbuff[128*7676]:%f\r\n",MAX_CPU_NUMBER_,elapsed,cbuff[128*7676]);
     sub_pthread_exit();
 
     memset(cbuff, 0 , m * n * sizeof(float));
@@ -323,7 +322,7 @@ int main()
     clock_gettime(CLOCK_MONOTONIC, &finish);
     elapsed = (finish.tv_sec - start.tv_sec);
     elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
-    printf("single thread openblas elapsed  time:%f cbuff[128*7676]:%f\r\n",elapsed, cbuff[128*7676]);
+    printf("4 thread openblas elapsed  time:%f cbuff[128*7676]:%f\r\n",elapsed, cbuff[128*7676]);
     
     free(abuff);
     free(bbuff);
