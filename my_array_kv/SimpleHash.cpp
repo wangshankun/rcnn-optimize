@@ -2,7 +2,6 @@
 // key value的数组
 //
 //
-
 #include <cassert>
 #include <chrono>
 #include <cstdint>
@@ -14,113 +13,124 @@
 #include <cstring>
 
 const int TEST_TABLE_SIZE = 10000;
-
 extern uint64_t CityHash64(const char *s, size_t len);
 
 template<class K, class V>//std::array<char, 64>, std::array<float, 64>
 class SimpleHash {
- public:
-  int usedslots = 0;
+  public://这里为了调试方便这里设置为public,工程使用时候设置为private
+	int usedslots = 0;//观察实际使用水位，水位过半后hash冲突会增加，超过70%需要扩容
 
-  std::vector<K> keys;
-  std::vector<V> vals;
-  std::vector<uint8_t> used;
+	std::vector<K> keys;
+	std::vector<V> vals;
+	std::vector<uint8_t> used;
 
-  //size0 should be a prime and about 30% larger than the maximum number needed
-  SimpleHash(int size0){
-    vals.resize(size0);
-    keys.resize(size0);
-    used.resize(size0/8+1,0);
-  }
-
-  //If the key values are already uniformly distributed, using a hash gains us
-  //nothing
-  uint64_t hash(const K key){
-	std::string str(key.data());
-    return CityHash64(str.c_str(), str.size());
-  }
-
-  bool isUsed(const uint64_t loc){
-    const auto used_loc = loc/8;
-    const auto used_bit = 1<<(loc%8);
-    return used[used_loc]&used_bit;    
-  }
-
-  void setUnused(const uint64_t loc){
-    const auto used_loc = loc/8;
-    const auto used_bit = 1<<(loc%8);
-	used[used_loc] = used[used_loc] &~ used_bit;
-  }
-
-  void setUsed(const uint64_t loc){
-    const auto used_loc = loc/8;
-    const auto used_bit = 1<<(loc%8);
-    used[used_loc] |= used_bit;
-  }
-  
-  void insert(const K key, const V val){
-    uint64_t loc = hash(key)%keys.size();
-
-    //Use linear probing. Can create infinite loops if table too full.
-    while(isUsed(loc)){ loc = (loc+1)%keys.size(); }
-
-    setUsed(loc);
-    keys[loc] = key;
-    vals[loc] = val;
-  }
-
-  int remove(const K key){
-    uint64_t loc = hash(key)%keys.size();
-
-    while(true)
+	//size0 should be a prime and about 30% larger than the maximum number needed
+	SimpleHash(int size0)
 	{
-      if(!isUsed(loc))
-	  {
-		  return -1;
-	  }  
-	  if(strcmp(keys[loc].data(), key.data()) == 0)//isUsed设置true 且 key相同情况下，证明找到了
-	  {
-		memset(keys[loc].data(), 0, sizeof(keys[loc][0]) * keys[loc].size());
-		memset(vals[loc].data(), 0, sizeof(vals[loc][0]) * vals[loc].size());
-		setUnused(loc);
-		return 0;
-	  }
-      loc = (loc+1)%keys.size();
-    }
-  }
-  
-  int get(const K key, V& value) {
-    uint64_t loc = hash(key)%keys.size();
+		vals.resize(size0);
+		keys.resize(size0);
+		used.resize(size0/8+1,0);
+	}
 
-    while(true)
+	//If the key values are already uniformly distributed, using a hash gains us
+	//nothing
+	uint64_t hash(const K key)
 	{
-      if(!isUsed(loc))
-	  {
-		  return -1;
-	  }  
-	  if(strcmp(keys[loc].data(), key.data()) == 0)
-	  {
-		value = vals[loc];
-		return 0;
-	  }
-      loc = (loc+1)%keys.size();
-    }
-  }
+		std::string str(key.data());
+		return CityHash64(str.c_str(), str.size());
+	}
 
-  uint64_t usedSize() const {
-    return usedslots;
-  }
+	bool isUsed(const uint64_t loc)
+	{
+		const auto used_loc = loc/8;
+		const auto used_bit = 1<<(loc%8);
+		return used[used_loc]&used_bit;    
+	}
 
-  uint64_t size() const {
-    return keys.size();
-  }
+	void setUnused(const uint64_t loc)
+	{
+		const auto used_loc = loc/8;
+		const auto used_bit = 1<<(loc%8);
+		used[used_loc] = used[used_loc] &~ used_bit;
+	}
+
+	void setUsed(const uint64_t loc)
+	{
+		const auto used_loc = loc/8;
+		const auto used_bit = 1<<(loc%8);
+		used[used_loc] |= used_bit;
+	}
+  public:
+	void insert(const K key, const V val)
+	{
+		uint64_t loc = hash(key)%keys.size();
+
+		//Use linear probing. Can create infinite loops if table too full.
+		while(isUsed(loc)){ loc = (loc+1)%keys.size(); }
+
+		setUsed(loc);
+		usedslots++;
+		keys[loc] = key;
+		vals[loc] = val;
+	}
+
+	int remove(const K key)
+	{
+		uint64_t loc = hash(key)%keys.size();
+
+		while(true)
+		{
+			if(!isUsed(loc))
+			{
+			  return -1;
+			}  
+			if(strcmp(keys[loc].data(), key.data()) == 0)//isUsed设置true 且 key相同情况下，证明找到了
+			{
+				memset(keys[loc].data(), 0, sizeof(keys[loc][0]) * keys[loc].size());
+				memset(vals[loc].data(), 0, sizeof(vals[loc][0]) * vals[loc].size());
+				setUnused(loc);
+				usedslots--;
+				return 0;
+			}
+			loc = (loc+1)%keys.size();
+		}
+	}
+
+	int get(const K key, V& value)
+	{
+		uint64_t loc = hash(key)%keys.size();
+		while(true)
+		{
+			if(!isUsed(loc))
+			{
+				return -1;
+			}  
+			if(strcmp(keys[loc].data(), key.data()) == 0)
+			{
+				value = vals[loc];
+				return 0;
+			}
+			loc = (loc+1)%keys.size();
+		}
+	}
+
+	uint64_t size() const
+	{
+		return keys.size();
+	}
+
+	uint64_t usedSize() const
+	{
+		return usedslots;
+	}
 };
 
 #define db_file "test.db"
 
 typedef SimpleHash<std::array<char, 64>, std::array<float, 64> > table_t;
 
-void SaveSimpleHash(const table_t &map){
+void SaveSimpleHash(const table_t &map)
+{
   std::cout<<"Save. ";
   const auto start = std::chrono::steady_clock::now();
   FILE *f = fopen(db_file, "wb+");
@@ -144,7 +154,8 @@ void SaveSimpleHash(const table_t &map){
   std::cout<<"Save time = "<< std::chrono::duration<double, std::milli> (end-start).count() << " ms" << std::endl;
 }
 
-table_t LoadSimpleHash(){
+table_t LoadSimpleHash()
+{
   std::cout<<"Load. ";
   const auto start = std::chrono::steady_clock::now();
   FILE *f = fopen(db_file, "rb+");
@@ -170,7 +181,8 @@ table_t LoadSimpleHash(){
   return map;
 }
 
-int main(){
+int main()
+{
   //Perfectly horrendous way of seeding a PRNG, but we'll do it here for brevity
   auto generator = std::mt19937(12345); //Combination of my luggage
   //Generate values within the specified closed intervals
