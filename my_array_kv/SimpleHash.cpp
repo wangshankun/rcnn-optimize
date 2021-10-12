@@ -24,13 +24,42 @@ class SimpleHash {
 	vector<array<char, 64>> keys;
 	vector<array<float, 64>> vals;
 	vector<uint8_t> used;
-	
+
+	//已经做过l2_norm可以用cos_distance_unit_id计算余弦距离
+	float cos_distance_unit_id(const array<float, 64> &val_a, const array<float, 64> &val_b)
+	{
+		float dist = 0;
+		for (int i = 0; i < 64; i++)
+		{
+			dist += ((val_a[i]) * (val_b[i]));
+		}
+		return dist;
+	}
+	//计算两vector的余弦距离
+	float cos_distance(const array<float, 64> &val_a, const array<float, 64> &val_b)
+	{
+		float l2_norm_1 = 0;
+		float l2_norm_2 = 0;
+		float dist = 0;
+		for (int i = 0; i < 64; i++)
+		{
+			l2_norm_1 += ((val_a[i]) * (val_a[i]));
+			l2_norm_2 += ((val_b[i]) * (val_b[i]));
+		}
+		l2_norm_1 = sqrt(l2_norm_1);
+		l2_norm_2 = sqrt(l2_norm_2);
+		for (int i = 0; i < 64; i++)
+		{
+			dist += ((val_a[i]) * (val_b[i]) / (l2_norm_1 * l2_norm_2));
+		}
+		return dist;
+	}
+
 	//If the key values are already uniformly distributed, using a hash gains us
 	//nothing
-	uint64_t hash(const array<char, 64> key)
+	uint64_t hash(const string key)
 	{
-		string str(key.data());
-		return CityHash64(str.c_str(), str.size());
+		return CityHash64(key.c_str(), key.size());
 	}
 
 	bool isUsed(const uint64_t loc)
@@ -66,8 +95,49 @@ class SimpleHash {
 	{
 	}
 
-	void insert(const array<char, 64> key, const array<float, 64> val)
+    void get_all_keys(vector<string> &key_vec)
 	{
+		for(int i = 0; i < keys.size(); i++)
+		{
+			if(isUsed(i))
+			{
+				string str(keys[i].data());
+				key_vec.push_back(str);
+			}
+		}
+	}
+
+	string from_similarvalue_get_key(const array<float, 64> &val, float th_hold)
+	{
+		for(int i = 0; i < keys.size(); i++)
+		{
+			if(isUsed(i))
+			{
+				float score = cos_distance(val, vals[i]);
+                if(score >= th_hold)
+                {
+					string str(keys[i].data());
+                    return str;
+                }
+			}
+		}
+		string str;
+		return str;
+	}
+
+	int insert(const string key, const array<float, 64> &val)
+	{
+		if(usedslots >= keys.size() * 0.7)
+		{
+			printf("Error insert faild, db full \r\n");
+			return -1;
+		}
+		if(key.length() >= 63)
+		{
+			printf("Error insert faild, key length is overflow\r\n");
+			return -1;
+		}
+
 		uint64_t loc = hash(key)%keys.size();
 
 		//Use linear probing. Can create infinite loops if table too full.
@@ -75,11 +145,14 @@ class SimpleHash {
 
 		setUsed(loc);
 		usedslots++;
-		keys[loc] = key;
+
+		//keys[loc] = key;
+		std::copy(key.begin(), key.end(), keys[loc].data());
+		keys[loc][key.length()] = 0;
 		vals[loc] = val;
 	}
 
-	int remove(const array<char, 64> key)
+	int remove(const string key)
 	{
 		uint64_t loc = hash(key)%keys.size();
 
@@ -88,8 +161,8 @@ class SimpleHash {
 			if(!isUsed(loc))
 			{
 			  return -1;
-			}  
-			if(strcmp(keys[loc].data(), key.data()) == 0)//isUsed设置true 且 key相同情况下，证明找到了
+			}
+			if(strcmp(keys[loc].data(), key.c_str()) == 0)//isUsed设置true 且 key相同情况下，证明找到了
 			{
 				//memset(keys[loc].data(), 0, sizeof(keys[loc][0]) * keys[loc].size());没有必要重置
 				//memset(vals[loc].data(), 0, sizeof(vals[loc][0]) * vals[loc].size());
@@ -101,7 +174,7 @@ class SimpleHash {
 		}
 	}
 
-	int get(const array<char, 64> key, array<float, 64>& value)
+	int get(const string key, array<float, 64>& value)
 	{
 		uint64_t loc = hash(key)%keys.size();
 		while(true)
@@ -124,7 +197,7 @@ class SimpleHash {
 		return keys.size();
 	}
 
-	uint64_t usedSize() const
+	uint64_t used_size() const
 	{
 		return usedslots;
 	}
@@ -194,7 +267,7 @@ int main()
 	auto generator = mt19937(12345); //Combination of my luggage
 	//Generate values within the specified closed intervals
 
-	SimpleHash map(1.38 * TEST_TABLE_SIZE);//1.38倍的hash容量
+	SimpleHash map(TEST_TABLE_SIZE * (1.0/0.7));//1.42倍的hash容量
 	cout<< "Created table of size "<< map.size()<<endl;
 
 	cout<<"Generating test data..."<<endl;
@@ -203,7 +276,8 @@ int main()
 	{
 		array<char, 64> key = {0};
 		sprintf(key.data(), "%s_%d", FACE_DNA_KEY, i);
-
+                string key_str(key.data()); 
+		
 		array<float, 64> value;
 		for(int i = 0; i < 64; ++i)
 		{
@@ -211,7 +285,7 @@ int main()
 			value[i] = dist(generator);
 		}
 
-		map.insert(key, value); //Low chance of collisions, so we get quite close to the desired size
+		map.insert(key_str, value); //Low chance of collisions, so we get quite close to the desired size
 	}
 
 //=================测试文件读写==============================
@@ -228,7 +302,7 @@ int main()
 		cout<<"Load time = "<< chrono::duration<double, milli> (end-start).count() << " ms" << endl;
 	}
 //=================测试文件读写正确性==============================
-	array<char, 64> test_key = {"face_dna_key_777"};
+	string test_key = "face_dna_key_777";
 	array<float, 64> test_value = {0};
 	if(map.get(test_key, test_value) == 0)
 	{
@@ -252,7 +326,7 @@ int main()
 		const auto end = chrono::steady_clock::now();
 		cout<<"New Load time = "<< chrono::duration<double, milli> (end-start).count() << " ms" << endl;
 
-		array<char, 64> test_key = {"face_dna_key_777"};
+		string test_key = {"face_dna_key_777"};
 		array<float, 64> test_value = {0};
 		if(newmap.get(test_key, test_value) == 0)
 		{
