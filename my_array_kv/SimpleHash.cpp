@@ -95,6 +95,14 @@ class SimpleHash {
 	{
 	}
 
+ 	SimpleHash(const SimpleHash &obj)//拷贝构造
+	{
+		uint64_t size0 = obj.size();
+		vals = obj.vals;
+		keys = obj.keys ;
+		used = obj.used;
+	}
+
     void get_all_keys(vector<string> &key_vec)
 	{
 		for(int i = 0; i < keys.size(); i++)
@@ -320,11 +328,12 @@ int main()
 	}
 	
     {
-		SimpleHash newmap;//测试空map从文件加载
+		SimpleHash newmap, n_newmap;//测试空map从文件加载
 		const auto start = chrono::steady_clock::now();
-		newmap.loadfile(db_file);
+		n_newmap.loadfile(db_file);
 		const auto end = chrono::steady_clock::now();
 		cout<<"New Load time = "<< chrono::duration<double, milli> (end-start).count() << " ms" << endl;
+                newmap = n_newmap;//测试拷贝构造
 
 		string test_key = {"face_dna_key_777"};
 		array<float, 64> test_value = {0};
